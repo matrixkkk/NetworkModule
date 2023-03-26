@@ -1,6 +1,6 @@
 # NetworkModule
 
-C# Socket Network
+C# TCP Socket Network
 
 # Description
 
