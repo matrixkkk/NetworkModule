@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c5976228df314514da63fc615ec708b8, type: 3}
+  m_Name: ServerSettings
+  m_EditorClassIdentifier: Assembly-CSharp:Assets.Scripts.ClientSide:ServerSettings
+  serverType: 1
+  port: 20000
+  devServerDomain: 127.0.0.1
+  backgroundTimeout: 60
+  fakeKey: 1d0bad01640b570bfb1a9d0fa90c39138a041101690668086210d31c541e4310
+  xorKey: 960b3501f00b0a0bd21af10fe80cb8133004d50131060b089c10d81c3d1e4710
