@@ -9,7 +9,7 @@ public class SampleScene : MonoBehaviour
     public Server server;
     public NetworkHandler networkHandler;
     public ServerSettings settings;     //서버 설정 정보
-    public Text serverButtonText;
+    public Text txtConnectButton;
 
     public ClientUI clientPrefab;       //클라이언트 ui 프리팹
     public Transform uiRoot;
@@ -20,7 +20,8 @@ public class SampleScene : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        serverButtonText.text = "Start Server";
+        txtConnectButton.text = "Start Server";
+        Application.targetFrameRate = 60;
     }
 
     public void OnClickRunServerButton()
@@ -28,12 +29,12 @@ public class SampleScene : MonoBehaviour
         if(!server.IsRunning)
         {
             server.StartServer();
-            serverButtonText.text = "Shutdown Server";
+            txtConnectButton.text = "Shutdown Server";
         }
         else
         {
             server.EndServer();
-            serverButtonText.text = "Start Server";
+            txtConnectButton.text = "Start Server";
         }
     }
 
