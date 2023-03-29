@@ -119,31 +119,5 @@ namespace Assets.Scripts.Protocol
             buffer[offset] = (byte)(aValue);
             buffer[offset + 1] = (byte)(aValue >> 8);
         }
-        //128 암호화
-        private void Encrypt(byte[] input, int offset, int inputSize, byte[] output, int outOff, byte[] key, byte[] iv)
-        {
-            RijndaelManaged RijndaelCipher = new RijndaelManaged();
-
-            RijndaelCipher.Key = key;
-            //RijndaelCipher.IV = iv;
-            RijndaelCipher.Mode = CipherMode.ECB;
-            RijndaelCipher.Padding = PaddingMode.PKCS7;
-
-            ICryptoTransform encryptor = RijndaelCipher.CreateEncryptor();
-
-            input = encryptor.TransformFinalBlock(input, offset, inputSize);
-            //using (MemoryStream msEncrypt = new MemoryStream(output))
-            //{
-            //    msEncrypt.Seek(outOff, SeekOrigin.Begin);
-            //    using (CryptoStream cs = new CryptoStream(msEncrypt, encryptor, CryptoStreamMode.Write))
-            //    {
-            //        cs.Write(input, offset, inputSize);
-            //        //using (StreamWriter sw = new StreamWriter(cs))
-            //        //{
-            //        //    sw.Write(input);
-            //        //}
-            //    }
-            //}
-        }
     }
 }

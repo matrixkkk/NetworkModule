@@ -9,8 +9,8 @@ using Assets.Scripts.Protocol;
 /// </summary>
 public class ClientUI : MonoBehaviour
 {
-    public Text tID;
-    public Text ping;
+    public Text txtID;
+    public Text txtPing;
 
     private NetworkPeer peer;
 
@@ -30,8 +30,8 @@ public class ClientUI : MonoBehaviour
 
     public void SetID(string aID)
     {
-        tID.text = aID;
-        tID.color = Color.red;
+        txtID.text = aID;
+        txtID.color = Color.red;
     }
 
     /// <summary>
@@ -48,7 +48,7 @@ public class ClientUI : MonoBehaviour
     {
         Login_Send send = new Login_Send()
         {
-            id = tID.text
+            id = txtID.text
         };
         peer.AddQueue(new Packet((ushort)PacketID.Login_Send, send.ToJson()));
     }
@@ -70,7 +70,7 @@ public class ClientUI : MonoBehaviour
                     if(!recv.IsError())
                     {
                         peer.SessionID = recv.session;
-                        tID.color = Color.green;
+                        txtID.color = Color.green;
                     }
                 }
                 break;
@@ -80,7 +80,7 @@ public class ClientUI : MonoBehaviour
                     if(!recv.IsError())
                     {
                         float delta = Time.realtimeSinceStartup - lastPingSendTime;
-                        ping.text = (int)(delta * 1000) + "ms";
+                        txtPing.text = (int)(delta * 1000) + "ms";
                     }
                 }
                 break;
@@ -89,7 +89,7 @@ public class ClientUI : MonoBehaviour
 
     IEnumerator PingLoop()
     {
-        ping.text = "";
+        txtPing.text = "";
         while (peer == null)
             yield return null;
 

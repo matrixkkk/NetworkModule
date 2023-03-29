@@ -8,15 +8,6 @@ using UnityEngine;
 
 namespace Assets.Scripts.ClientSide
 {
-    public enum PeerState : byte
-    {
-        Disconnected = 0,               //디스커넥트 됨
-        Connecting = 1,                 //연결중
-        Connected = 3,                  //연결됨
-        Disconnecting = 4,              //디스커넥팅 중
-        InitializingApplication = 10    //앱 초기화 중
-    }
-
     public enum eLogLevel
     {
         Errors,                         //에러만 보여줌.
@@ -26,7 +17,7 @@ namespace Assets.Scripts.ClientSide
     public enum eClientState
     {
         //초기화 안됨
-        Uninitialized,
+        UnInitialized,
         Disconnecting,      //디스커넥트 중
         Connecting,         //연결 중
         Connected,
@@ -64,7 +55,7 @@ namespace Assets.Scripts.ClientSide
 
         private bool mIsInitializeConnect = false;      //초기화 여부
         private bool mIsSendAsk = false;
-        private eClientState mClientState = eClientState.Uninitialized;                           //클라이언트 상태
+        private eClientState mClientState = eClientState.UnInitialized;                           //클라이언트 상태
 
         #region callbacks
         public delegate void OnConnectCallback();
@@ -95,12 +86,6 @@ namespace Assets.Scripts.ClientSide
 
         public bool Connect(string serverAddress, int port)
         {
-            if (NetworkHandler.AppQuits)
-            {
-                Debug.LogError("Ignoring Connect() because app gets closed. If this is an error, check NetworkHandler.AppQuits.");
-                return false;
-            }
-
             if (mClientState == eClientState.Disconnecting)
             {
                 Debug.LogError("Connect() failed. Can't connect while disconnecting (still). Current state");
