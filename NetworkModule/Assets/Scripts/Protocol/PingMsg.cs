@@ -16,6 +16,7 @@ namespace Assets.Scripts.Protocol
     public struct Ping_Recv : iReceiveMessage
     {
         public int error;
+        public string text;
 
         public bool IsError()
         {

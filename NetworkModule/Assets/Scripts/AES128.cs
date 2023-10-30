@@ -43,7 +43,7 @@ namespace Assets.Scripts
             return Encryptor.TransformFinalBlock(input, 0, size);
         }
 
-        public static byte[] Decrypt(byte[] input, int size, byte[] key)
+        public static byte[] Decrypt(byte[] input, int offset, int size, byte[] key)
         {
             RijndaelManaged RijndaelCipher = new RijndaelManaged();
 
@@ -57,22 +57,16 @@ namespace Assets.Scripts
             }
 
             byte[] resultArray = null;
-#if UNITY_EDITOR
             try
             {
                 ICryptoTransform dectryption = RijndaelCipher.CreateDecryptor();
-                resultArray = dectryption.TransformFinalBlock(input, 0, size);
+                resultArray = dectryption.TransformFinalBlock(input, offset, size);
             }
             catch (CryptographicException e)
             {
                 Debug.LogError(e.Message);
                 return null;
             }
-#else
-        ICryptoTransform dectryption = RijndaelCipher.CreateDecryptor();
-        resultArray = dectryption.TransformFinalBlock(input, 0, input.Length);
-        if (resultArray == null) return null;
-#endif
 
             return resultArray;
         }

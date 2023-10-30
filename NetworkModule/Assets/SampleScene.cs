@@ -53,6 +53,7 @@ public class SampleScene : MonoBehaviour
         NetworkPeer newPeer = new NetworkPeer();
         newPeer.EncryptKey = settings.GetKey();
         newPeer.IsInitialConnect = true;
+        //newPeer.SetBufferSize(4, 4096, 8192);
         newPeer.Connect(settings.GetDomain(), settings.port);
         newPeer.OnConnect = () =>
         {
