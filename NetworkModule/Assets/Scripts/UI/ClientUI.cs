@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
 using Assets.Scripts.Protocol;
+using ClientSide;
 
 /// <summary>
 /// 클라이언트 UI

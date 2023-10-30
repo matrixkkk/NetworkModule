@@ -1,6 +1,8 @@
-﻿using Assets.Scripts.ClientSide;
+﻿using System;
+using Assets.Scripts.ClientSide;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using ClientSide;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -22,6 +24,15 @@ public class SampleScene : MonoBehaviour
     {
         txtConnectButton.text = "Start Server";
         Application.targetFrameRate = 60;
+    }
+
+    private void OnApplicationQuit()
+    {
+        foreach (var peer in peerList)
+        {
+            peer.Disconnect();
+        }
+        peerList.Clear();
     }
 
     public void OnClickRunServerButton()

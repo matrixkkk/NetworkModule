@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
+using Unity.Properties;
 using UnityEngine;
 
 public class Server : MonoBehaviour
@@ -104,7 +105,7 @@ public class Server : MonoBehaviour
         else if(p.packet.ID == (ushort)PacketID.Ping_Send)
         {
             StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < 4075; i++)
+            for (int i = 0; i < 2000; i++)
             {
                 sb.Append("1");
             }
@@ -117,6 +118,18 @@ public class Server : MonoBehaviour
             };
             ushort recvID = (ushort)(p.packet.ID + 1);
             p.owner.Send(recvID, recv.ToJson());
+
+            sb.Clear();
+            for (int i = 0; i < 200; i++)
+            {
+                sb.Append("2");
+            }
+            Ping_Recv send = new Ping_Recv()
+            {
+                error = 0,
+                text = sb.ToString()
+            };
+            p.owner.Send(recvID, send.ToJson());
         }
     }
 

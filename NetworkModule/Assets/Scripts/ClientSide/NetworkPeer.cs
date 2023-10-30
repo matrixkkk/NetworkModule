@@ -1,21 +1,22 @@
-﻿using Assets.Scripts.Protocol;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
+using Assets.Scripts;
+using Assets.Scripts.Protocol;
 using UnityEngine;
 
-namespace Assets.Scripts.ClientSide
+namespace ClientSide
 {
-    public enum eLogLevel
+    public enum LogLevel
     {
         Errors,                         //에러만 보여줌.
         Informational,                  //정보 포함
     }
 
-    public enum eClientState
+    public enum ClientState
     {
         //초기화 안됨
         UnInitialized,
@@ -40,48 +41,60 @@ namespace Assets.Scripts.ClientSide
         private TcpClient _tcpSocket;                           //네트워크 소켓
         private NetworkStream _stream = null;                   //네트워크 스트림
 
-        private object _lockPacketQueue = new object();         //동기화 객체
+        private readonly object _lockPacketQueue = new object();         //동기화 객체
         private Header _receiveHeader;                          //받은 헤더 정보
         private byte[] _streamBuffer;                           //스트림 버퍼.
 
         private byte[] _sendBuffer;                             //send 버퍼
         private byte[] _receiveBuffer;                          //receive buffer
-        private uint _totalRecvSize = 0;                        //이번에 받을 패킷의 총 사이즈
-        private uint _accumRecvSize = 0;                        //누적 recv size
+        private uint _totalReceiveSize = 0;                        //이번에 받을 패킷의 총 사이즈
+        private uint _accumReceiveSize = 0;                        //누적 받은 사이즈
         private ushort _lastPacketSeq = 0;                      //마지막 패킷 시퀀스
 
-        private Queue<Packet> _receivePacketQueue = new Queue<Packet>();        //받은 패킷 큐
-        private Queue<Packet> _sendPacketQueue = new Queue<Packet>();           //send 패킷 큐
+        private readonly Queue<Packet> _receivePacketQueue = new Queue<Packet>();        //받은 패킷 큐
+        private readonly Queue<Packet> _sendPacketQueue = new Queue<Packet>();           //send 패킷 큐
 
         private byte[] _key;                               //암호화 키
-        private byte[] _iv = new byte[16];                 //iv
+        private readonly byte[] _iv = new byte[16];                 //iv
         private ulong _sessionID;                         //세션 ID
 
         private bool _isInitializeConnect = false;      //초기화 여부
         private bool _isSendAsk = false;
-        private eClientState _clientState = eClientState.UnInitialized;                           //클라이언트 상태
+        private ClientState _clientState = ClientState.UnInitialized;                           //클라이언트 상태
 
         public int HeaderSize { set => _headerSize = value; }
         public int PacketSizeOffset { set => _packetSizeOffset = value; }
 
         #region callbacks
         public delegate void OnConnectCallback();
-        public delegate void OnDisconnnectCallback();
+        public delegate void OnDisconnectCallback();
         public delegate void OnReceiveCallback(Packet p);
 
         public OnConnectCallback OnConnect { get; set; }
-        public OnDisconnnectCallback OnDisconnect { get; set; }
+        public OnDisconnectCallback OnDisconnect { get; set; }
         public OnReceiveCallback OnReceive { get; set; }
         #endregion
 
-        public bool IsInitialConnect { get { return _isInitializeConnect; } set { _isInitializeConnect = value; } }
-        public ulong SessionID { set { _sessionID = value; } }
-        public bool HasSession { get => _sessionID != 0; }
-        public bool IsSendAsk { get { return _isSendAsk; } set { _isSendAsk = true; } }
+        public bool IsInitialConnect 
+        { 
+            get => _isInitializeConnect;
+            set => _isInitializeConnect = value;
+        }
+        public ulong SessionID { set => _sessionID = value; }
+        public bool HasSession => _sessionID != 0;
+        public bool IsSendAsk 
+        { 
+            get => _isSendAsk;
+            set => _isSendAsk = value;
+        }
 
-        public eClientState State { get { return _clientState; } set { _clientState = value; } }
-        public Socket TcpSocket { get { return _tcpSocket.Client; } }
-        public bool Connected { get { return _tcpSocket != null && _tcpSocket.Connected && _clientState == eClientState.Connected; } }
+        public ClientState State 
+        { 
+            get => _clientState;
+            set => _clientState = value;
+        }
+        public Socket TcpSocket => _tcpSocket.Client;
+        public bool Connected => _tcpSocket != null && _tcpSocket.Connected && _clientState == ClientState.Connected;
         public float LastSendOutTime { get; private set; }
         public byte[] EncryptKey { set => _key = value; }
 
@@ -94,7 +107,7 @@ namespace Assets.Scripts.ClientSide
 
         public bool Connect(string serverAddress, int port)
         {
-            if (_clientState == eClientState.Disconnecting)
+            if (_clientState == ClientState.Disconnecting)
             {
                 Debug.LogError("Connect() failed. Can't connect while disconnecting (still). Current state");
                 return false;
@@ -105,7 +118,7 @@ namespace Assets.Scripts.ClientSide
             bool isConnecting = Connecting(serverAddress, port);
             if (isConnecting)
             {
-                _clientState = eClientState.Connecting;
+                _clientState = ClientState.Connecting;
             }
 
             return isConnecting;
@@ -114,14 +127,15 @@ namespace Assets.Scripts.ClientSide
         /// <summary>
         /// 버퍼 사이즈 설정
         /// </summary>
-        /// <param name="receiveBuferSize"></param>
+        /// <param name="receiveBufferSize"></param>
         /// <param name="sendBufferSize"></param>
-        public void SetBufferSize(int receiveBuferSize, int sendBufferSize, int streamBufferSize)
+        /// <param name="streamBufferSize"></param>
+        public void SetBufferSize(int receiveBufferSize, int sendBufferSize, int streamBufferSize)
         {
-            if (_receiveBufferSize != receiveBuferSize)
+            if (_receiveBufferSize != receiveBufferSize)
             {
-                _receiveBufferSize = receiveBuferSize;
-                _receiveBuffer = new byte[receiveBuferSize];
+                _receiveBufferSize = receiveBufferSize;
+                _receiveBuffer = new byte[receiveBufferSize];
             }
             if (_sendBufferSize != sendBufferSize)
             {
@@ -150,7 +164,7 @@ namespace Assets.Scripts.ClientSide
             catch (Exception e)
             {
                 _isInitializeConnect = false;
-                _clientState = eClientState.Disconnected;
+                _clientState = ClientState.Disconnected;
                 Debug.LogError(e.Message);
                 return false;
             }
@@ -230,7 +244,7 @@ namespace Assets.Scripts.ClientSide
             catch (SocketException e)
             {
                 Debug.LogError(e.Message);
-                _clientState = eClientState.Disconnected;
+                _clientState = ClientState.Disconnected;
                 return;
             }
 
@@ -242,19 +256,19 @@ namespace Assets.Scripts.ClientSide
                     _sendPacketQueue.Clear();
                 }
 
-                _clientState = eClientState.Connected;
+                _clientState = ClientState.Connected;
 
                 //스트림 가져옴.
                 _stream = tcp.GetStream();
 
-                Debug.Log("Connect success : " + DateTime.Now.ToString());
+                Debug.Log("Connect success : " + DateTime.Now.ToString(CultureInfo.InvariantCulture));
                 //ReadHeader();
                 ReadStream(true);
                 OnConnect?.Invoke();
             }
             else
             {
-                _clientState = eClientState.Disconnected;
+                _clientState = ClientState.Disconnected;
             }
         }
 
@@ -265,24 +279,30 @@ namespace Assets.Scripts.ClientSide
         {
             if (isReset)
             {
-                _accumRecvSize = 0;
-                _totalRecvSize = 0;
+                _accumReceiveSize = 0;
+                _totalReceiveSize = 0;
             }
-            Read((uint)_receiveBufferSize, 0, new AsyncCallback(RecvCallback));
+
+            uint readBytes = (uint)_receiveBufferSize;
+            if (readBytes + _accumReceiveSize >= _streamBufferSize)
+            {
+                readBytes = (uint)_streamBufferSize - _accumReceiveSize;
+            }
+            Read((uint)_receiveBufferSize, 0, new AsyncCallback(ReceiveCallback));
         }
 
         private void ReadHeader()
         {
-            _accumRecvSize = 0;
-            _totalRecvSize = Packet.HEADER_SIZE;
-            Read(_totalRecvSize, 0, new AsyncCallback(RecvHeaderCallback));
+            _accumReceiveSize = 0;
+            _totalReceiveSize = Packet.HEADER_SIZE;
+            Read(_totalReceiveSize, 0, new AsyncCallback(ReceiveHeaderCallback));
         }
 
         private void ReadBody()
         {
-            _accumRecvSize = 0;
-            _totalRecvSize = (_receiveHeader.size - Packet.HEADER_SIZE);
-            Read(_totalRecvSize, 0, new AsyncCallback(RecvBodyCallback));
+            _accumReceiveSize = 0;
+            _totalReceiveSize = (_receiveHeader.size - Packet.HEADER_SIZE);
+            Read(_totalReceiveSize, 0, new AsyncCallback(ReceiveBodyCallback));
         }
 
 
@@ -300,7 +320,7 @@ namespace Assets.Scripts.ClientSide
             }
             catch (Exception e)
             {
-                Debug.LogError("netStream BegineRead error : " + e.Message);
+                Debug.LogError("netStream BeginRead error : " + e.Message);
                 Disconnect();
                 return false;
             }
@@ -364,20 +384,18 @@ namespace Assets.Scripts.ClientSide
         public void Disconnect()
         {
             _sessionID = 0;
-            if (_tcpSocket != null && _tcpSocket.Connected)
-            {
-                OnDisconnect?.Invoke();
+            if (_tcpSocket is not { Connected: true }) return;
+            OnDisconnect?.Invoke();
 
-                try
-                {
-                    _tcpSocket.Client.Shutdown(SocketShutdown.Both);
-                    _tcpSocket.Client.BeginDisconnect(false, new AsyncCallback(CallbackDisconnect), this);
-                    _clientState = eClientState.Disconnecting;
-                }
-                catch (Exception e)
-                {
-                    Debug.LogError(e.Message);
-                }
+            try
+            {
+                _tcpSocket.Client.Shutdown(SocketShutdown.Both);
+                _tcpSocket.Client.BeginDisconnect(false, new AsyncCallback(CallbackDisconnect), this);
+                _clientState = ClientState.Disconnecting;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError(e.Message);
             }
         }
 
@@ -386,11 +404,9 @@ namespace Assets.Scripts.ClientSide
         /// </summary>
         private void CloseSocket()
         {
-            if (_tcpSocket != null)
-            {
-                _tcpSocket.Close();
-                _tcpSocket = null;
-            }
+            if (_tcpSocket == null) return;
+            _tcpSocket.Close();
+            _tcpSocket = null;
         }
 
         /// <summary>
@@ -403,7 +419,7 @@ namespace Assets.Scripts.ClientSide
             try
             {
                 peer.TcpSocket.EndDisconnect(result);
-                peer._clientState = eClientState.Disconnected;
+                peer._clientState = ClientState.Disconnected;
                 peer._isInitializeConnect = false;
 
                 peer.CloseSocket();
@@ -449,7 +465,8 @@ namespace Assets.Scripts.ClientSide
             {
                 return null;
             }
-            hostName.Trim();
+
+            hostName = hostName.Trim();
             if (IsDottedIPv4(hostName))
             {
                 return IPAddress.Parse(hostName);
@@ -458,9 +475,9 @@ namespace Assets.Scripts.ClientSide
             IPAddress ipAddress = null;
             IPHostEntry hostEntry = Dns.GetHostEntry(hostName);
 
-            for (int i = 0; i < hostEntry.AddressList.Length; i++)
+            foreach (var t in hostEntry.AddressList)
             {
-                ipAddress = hostEntry.AddressList[i];
+                ipAddress = t;
 
                 if (ipAddress.AddressFamily == AddressFamily.InterNetwork)
                 {
@@ -470,9 +487,9 @@ namespace Assets.Scripts.ClientSide
             }
 
             //ipv6 처리
-            for (int i = 0; i < hostEntry.AddressList.Length; i++)
+            foreach (var t in hostEntry.AddressList)
             {
-                ipAddress = hostEntry.AddressList[i];
+                ipAddress = t;
 
                 if (ipAddress.AddressFamily == AddressFamily.InterNetworkV6)
                 {
@@ -483,11 +500,11 @@ namespace Assets.Scripts.ClientSide
             return ipAddress;
         }
 
-        protected void RecvCallback(IAsyncResult asyncResult)
+        private void ReceiveCallback(IAsyncResult asyncResult)
         {
             int receiveSize = 0;
 
-            if (_tcpSocket == null || _clientState == eClientState.Disconnecting) return;
+            if (_tcpSocket == null || _clientState == ClientState.Disconnecting) return;
 
             try
             {
@@ -495,6 +512,7 @@ namespace Assets.Scripts.ClientSide
                 if (_tcpSocket.Connected && _stream != null)
                 {
                     receiveSize = _stream.EndRead(asyncResult);
+                    Debug.Log($"Receive size : {receiveSize}");
                 }
                 else
                 {
@@ -504,7 +522,7 @@ namespace Assets.Scripts.ClientSide
             catch (Exception e)
             {
                 Debug.LogError(e.Message);
-                if (_tcpSocket != null && _tcpSocket.Connected)
+                if (_tcpSocket is { Connected: true })
                 {
                     Disconnect();
                 }
@@ -519,28 +537,10 @@ namespace Assets.Scripts.ClientSide
             else
             {
                 //받은 그대로 스트림 버퍼로 복사
-                Buffer.BlockCopy(_receiveBuffer, 0, _streamBuffer, (int)_accumRecvSize, receiveSize);
-                _accumRecvSize += (uint)receiveSize;          //누적 바이트 더함
-
-                //헤더보다 적은경우
-                //if (_accumRecvSize < _totalRecvSize)
-                //{
-                //다시 추가로 받음.
-                //    Read(_totalRecvSize - _accumRecvSize, new AsyncCallback(RecvHeaderCallback));
-                //    return;
-                //}
-                //_receiveHeader = new Header(_streamBuffer);
-                //if (_totalRecvSize > STREAM_BUFFER_SIZE)
-                //{
-                //body가 버퍼보다 크다.
-                //Debug.LogError("Packet size error : " + _totalRecvSize);
-                //Disconnect();
-                //return;
-                //}
-
-                //body 사이즈로 받음
-                //ReadBody();
-                Packetization();
+                Buffer.BlockCopy(_receiveBuffer, 0, _streamBuffer, (int)_accumReceiveSize, receiveSize);
+                _accumReceiveSize += (uint)receiveSize;          //누적 바이트 더함
+              
+                CreatePacket();
                 ReadStream();
             }
         }
@@ -548,76 +548,84 @@ namespace Assets.Scripts.ClientSide
         /// <summary>
         /// 패킷화 처리
         /// </summary>
-        protected void Packetization()
+        private void CreatePacket()
         {
-            if (_accumRecvSize < _headerSize)
+            //헤더 사이즈보다 클 때만 처리한다
+            while (_accumReceiveSize >= _headerSize)
             {
-                //받은 패킷의 사이즈가 헤더사이즈보다 작은 경우 리턴
-                return;
-            }
-
-            //헤더 이상 받았을 경우 총 받을 사이즈를 계산합니다
-            _totalRecvSize = _streamBuffer[_packetSizeOffset];
-
-            if (_accumRecvSize >= _totalRecvSize)
-            {
-                Header header = new Header(_streamBuffer);
-
-                //누적사이즈가 총 사이즈보다 큰 경우 패킷을 구성함
-                //패킷 다 받음 - 패킷 구성
-                GenerateAES_IV(header.seq);
-
-                //body에 해당하는 부분 복호화
-                byte[] bytes = AES128.Decrypt(_streamBuffer, _headerSize, (int)(_totalRecvSize - _headerSize), _key);
-                if (bytes == null)
+                if (_totalReceiveSize == 0)
                 {
-                    Debug.LogError("Decrypt error : " + header.pId);
+                    //헤더 이상 받았을 경우 총 받을 사이즈를 계산합니다
+                    byte[] sizeBytes = new byte[4];
+                    Buffer.BlockCopy(_streamBuffer, _packetSizeOffset, sizeBytes, 0, sizeof(uint));
+                    _totalReceiveSize = BitConverter.ToUInt32(sizeBytes);
+                }
+                if(_accumReceiveSize < _totalReceiveSize)
+                {
+                    //패킷 구성할 만큼 받지 않았음
                     return;
                 }
-
-                uint crc = CRC32.GetCRC(bytes, (int)bytes.Length);
-                var pid = System.BitConverter.GetBytes(header.pId);
-                var seq = System.BitConverter.GetBytes(header.seq);
-                crc = CRC32.GetCRC(pid, pid.Length, crc);
-                crc = CRC32.GetCRC(seq, seq.Length, crc);
-                if (crc != header.crc)
+                else
                 {
-                    Debug.LogError("CRC error : " + header.pId);
-                    return;
-                }
+                    Header header = new Header(_streamBuffer);
 
-                string byteToString = System.Text.Encoding.UTF8.GetString(bytes, 0, bytes.Length);
+                    //누적사이즈가 총 사이즈보다 큰 경우 패킷을 구성함
+                    //패킷 다 받음 - 패킷 구성
+                    GenerateAES_IV(header.seq);
 
-                //받은 리스트에 추가.
-                lock (_lockPacketQueue)
-                {
-                    _lastPacketSeq = header.seq;
-                    _receivePacketQueue.Enqueue(new Packet(header, byteToString));
-                }
-
-                //사용한 만큼 버퍼 삭제하고 남은 부분 좌측 시프트
-                for (int i = 0; i < _accumRecvSize; i++)
-                {
-                    if (_accumRecvSize < _streamBufferSize)
+                    //body에 해당하는 부분 복호화
+                    byte[] bytes = AES128.Decrypt(_streamBuffer, _headerSize, (int)(_totalReceiveSize - _headerSize), _key);
+                    if (bytes == null)
                     {
-                        _streamBuffer[i] = _streamBuffer[_accumRecvSize + i];
-                        _streamBuffer[_accumRecvSize + i] = 0;
+                        Debug.LogError("Decrypt error : " + header.pId);
+                        return;
                     }
+
+                    uint crc = CRC32.GetCRC(bytes, (int)bytes.Length);
+                    var pid = System.BitConverter.GetBytes(header.pId);
+                    var seq = System.BitConverter.GetBytes(header.seq);
+                    crc = CRC32.GetCRC(pid, pid.Length, crc);
+                    crc = CRC32.GetCRC(seq, seq.Length, crc);
+                    if (crc != header.crc)
+                    {
+                        Debug.LogError("CRC error : " + header.pId);
+                        return;
+                    }
+
+                    string byteToString = System.Text.Encoding.UTF8.GetString(bytes, 0, bytes.Length);
+
+                    //받은 리스트에 추가.
+                    lock (_lockPacketQueue)
+                    {
+                        _lastPacketSeq = header.seq;
+                        _receivePacketQueue.Enqueue(new Packet(header, byteToString));
+                    }
+
+                    int offset = (int)_totalReceiveSize;
+                    //사용한 만큼 버퍼 삭제하고 남은 부분 좌측 시프트      
+                    for (int i = 0; i < _accumReceiveSize; i++)
+                    {
+                        if (_accumReceiveSize > _totalReceiveSize)
+                        {
+                            _streamBuffer[i] = _streamBuffer[offset + i];
+                        }
+                        _streamBuffer[offset + i] = 0;
+                    }
+                    _accumReceiveSize -= _totalReceiveSize;
+                    _totalReceiveSize = 0;
                 }
-                _accumRecvSize -= _totalRecvSize;
-                _totalRecvSize = 0;
             }
         }
 
         /// <summary>
         /// 헤더 사이즈로 받음
         /// </summary>
-        /// <param name="aResult"></param>
-        protected void RecvHeaderCallback(IAsyncResult asyncResult)
+        /// <param name="asyncResult"></param>
+        private void ReceiveHeaderCallback(IAsyncResult asyncResult)
         {
             int receiveSize = 0;
 
-            if (_tcpSocket == null || _clientState == eClientState.Disconnecting) return;
+            if (_tcpSocket == null || _clientState == ClientState.Disconnecting) return;
 
             try
             {
@@ -634,7 +642,7 @@ namespace Assets.Scripts.ClientSide
             catch (Exception e)
             {
                 Debug.LogError(e.Message);
-                if (_tcpSocket != null && _tcpSocket.Connected)
+                if (_tcpSocket is { Connected: true })
                 {
                     Disconnect();
                 }
@@ -648,20 +656,20 @@ namespace Assets.Scripts.ClientSide
             }
             else
             {
-                _accumRecvSize += (uint)receiveSize;          //누적 바이트 더함.
+                _accumReceiveSize += (uint)receiveSize;          //누적 바이트 더함.
 
                 //헤더보다 적은경우
-                if (_accumRecvSize < _totalRecvSize)
+                if (_accumReceiveSize < _totalReceiveSize)
                 {
                     //다시 추가로 받음.
-                    Read(_totalRecvSize - _accumRecvSize, (int)_accumRecvSize, new AsyncCallback(RecvHeaderCallback));
+                    Read(_totalReceiveSize - _accumReceiveSize, (int)_accumReceiveSize, new AsyncCallback(ReceiveHeaderCallback));
                     return;
                 }
                 _receiveHeader = new Header(_streamBuffer);
-                if (_totalRecvSize > _streamBufferSize)
+                if (_totalReceiveSize > _streamBufferSize)
                 {
                     //body가 버퍼보다 크다.
-                    Debug.LogError("Packet size error : " + _totalRecvSize);
+                    Debug.LogError("Packet size error : " + _totalReceiveSize);
                     Disconnect();
                     return;
                 }
@@ -674,8 +682,8 @@ namespace Assets.Scripts.ClientSide
         /// <summary>
         /// 패킷의 body 부분 받음
         /// </summary>
-        /// <param name="aReceiveBytes"></param>
-        private void RecvBodyCallback(IAsyncResult asyncResult)
+        /// <param name="asyncResult"></param>
+        private void ReceiveBodyCallback(IAsyncResult asyncResult)
         {
             int receiveSize = 0;
             try
@@ -699,18 +707,18 @@ namespace Assets.Scripts.ClientSide
             if (receiveSize == 0)
             {
                 //서버에 의해 소켓이 닫힘.
-                Debug.LogError("Close socket RecvBodyCallback");
+                Debug.LogError("Close socket ReceiveBodyCallback");
                 Disconnect();
             }
             else
             {
-                _accumRecvSize += (uint)receiveSize;
+                _accumReceiveSize += (uint)receiveSize;
                 //현재 스트림 모두 다 채웟는지
-                uint iRemainSize = _totalRecvSize - _accumRecvSize;
+                uint iRemainSize = _totalReceiveSize - _accumReceiveSize;
                 if (iRemainSize > 0)
                 {
                     //스트림 읽기 계속               
-                    Read(iRemainSize, (int)_accumRecvSize, new AsyncCallback(RecvBodyCallback));
+                    Read(iRemainSize, (int)_accumReceiveSize, new AsyncCallback(ReceiveBodyCallback));
                 }
                 else
                 {
@@ -718,7 +726,7 @@ namespace Assets.Scripts.ClientSide
                     GenerateAES_IV(_receiveHeader.seq);
 
                     //검증 후 string으로 변환
-                    byte[] bytes = AES128.Decrypt(_streamBuffer, 0, (int)_totalRecvSize, _key);
+                    byte[] bytes = AES128.Decrypt(_streamBuffer, 0, (int)_totalReceiveSize, _key);
                     if (bytes == null)
                     {
                         Debug.LogError("Decrypt error : " + _receiveHeader.pId);

@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using ClientSide;
 using UnityEngine;
 
 namespace Assets.Scripts.ClientSide
@@ -105,9 +106,9 @@ namespace Assets.Scripts.ClientSide
             {
                 foreach(var peer in peerList)
                 {
-                    if (peer.State == eClientState.Disconnected || (peer.State == eClientState.Connected && !peer.TcpSocket.Connected))
+                    if (peer.State == ClientState.Disconnected || (peer.State == ClientState.Connected && !peer.TcpSocket.Connected))
                     {
-                        peer.State = eClientState.Disconnected;
+                        peer.State = ClientState.Disconnected;
                         continue;
                     }
                     bool doRecv = true;
