@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -102,13 +103,17 @@ public class Server : MonoBehaviour
         }
         else if(p.packet.ID == (ushort)PacketID.Ping_Send)
         {
-            Ping_Send ping = JsonUtility.FromJson<Ping_Send>(p.packet.Str);
-
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < 4075; i++)
+            {
+                sb.Append("1");
+            }
             //로그인 검증 후 -
             //성공 패킷 다시 보냄.
             Ping_Recv recv = new Ping_Recv()
             {
-                error = 0
+                error = 0,
+                text = sb.ToString()
             };
             ushort recvID = (ushort)(p.packet.ID + 1);
             p.owner.Send(recvID, recv.ToJson());

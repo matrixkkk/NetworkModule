@@ -172,7 +172,7 @@ namespace Assets.Scripts.ClientSide
                 }
             }
 
-            foreach (var peer in peerList)
+            /*foreach (var peer in peerList)
             {
                 if(peer.IsSendAsk)
                 {
@@ -181,7 +181,7 @@ namespace Assets.Scripts.ClientSide
                         peer.SendAck();
                     }
                 }
-            }
+            }*/
         }
 
         /// <summary>

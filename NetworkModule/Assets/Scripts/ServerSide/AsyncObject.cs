@@ -139,7 +139,7 @@ namespace Assets.Scripts.ServerSide
                 {
                     Array.Clear(iv, 0, iv.Length);
                 }
-                byte[] bytes = AES128.Decrypt(buffer, recvSize, key);
+                byte[] bytes = AES128.Decrypt(buffer, 0, recvSize, key);
                
                 uint crc = CRC32.GetCRC(bytes, bytes.Length);
                 var pid = System.BitConverter.GetBytes(header.pId);
