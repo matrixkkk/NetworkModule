@@ -1,10 +1,11 @@
-﻿using System;
+using System;
+using Assets.Scripts.Protocol;
 using UnityEngine;
 
-namespace Assets.Scripts.Protocol
+namespace ServerSide
 {
     [Serializable]
-    public struct Login_Send : iSendMessage
+    public struct LoginReceive : iSendMessage
     {
         public string id;
 
@@ -15,7 +16,7 @@ namespace Assets.Scripts.Protocol
     }
 
     [Serializable]
-    public struct Login_Recv : iReceiveMessage
+    public struct LoginSend : iReceiveMessage
     {
         public ulong session;
         public int error;

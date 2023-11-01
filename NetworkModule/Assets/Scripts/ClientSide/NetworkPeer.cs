@@ -211,7 +211,7 @@ namespace ClientSide
             _sendPacketQueue.Enqueue(p);
         }
 
-        public void AddQueue(PacketID id, iSendMessage msg)
+        public void AddQueue(PacketId id, iSendMessage msg)
         {
             _sendPacketQueue.Enqueue(new Packet((ushort)id, msg.ToJson()));
         }

@@ -1,10 +1,11 @@
-﻿using System;
+using System;
+using Assets.Scripts.Protocol;
 using UnityEngine;
 
-namespace Assets.Scripts.Protocol
+namespace ClientSide
 {
     [Serializable]
-    public struct Ping_Send : iSendMessage
+    public struct PingSend : iSendMessage
     {
         public string ToJson()
         {
@@ -13,7 +14,7 @@ namespace Assets.Scripts.Protocol
     }
 
     [Serializable]
-    public struct Ping_Recv : iReceiveMessage
+    public struct PingReceive : iReceiveMessage
     {
         public int error;
         public string text;

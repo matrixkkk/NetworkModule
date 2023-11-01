@@ -3,36 +3,46 @@ using Assets.Scripts.ClientSide;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using ClientSide;
+using Controls;
+using ServerSide;
+using UI;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 public class SampleScene : MonoBehaviour
 {
-    public Server server;
+    [FormerlySerializedAs("_server")] [SerializeField]
+    private Server server;
     public NetworkHandler networkHandler;
     public ServerSettings settings;     //서버 설정 정보
     public Text txtConnectButton;
 
     public ClientUI clientPrefab;       //클라이언트 ui 프리팹
     public Transform uiRoot;
-
-    private List<NetworkPeer> peerList = new List<NetworkPeer>();
-    private ulong instance_id = 1;
+    
+    private readonly List<ClientControl> _clientControlList = new List<ClientControl>();
 
     // Start is called before the first frame update
-    void Start()
+    private void Start()
     {
         txtConnectButton.text = "Start Server";
         Application.targetFrameRate = 60;
     }
 
+    private void Update()
+    {
+        float delta = Time.deltaTime;
+        _clientControlList.ForEach(f=> f.UpdatePing(delta));
+    }
+
     private void OnApplicationQuit()
     {
-        foreach (var peer in peerList)
+        foreach (var clientControl in _clientControlList)
         {
-            peer.Disconnect();
+            clientControl.Disconnect();
         }
-        peerList.Clear();
+        _clientControlList.Clear();
     }
 
     public void OnClickRunServerButton()
@@ -61,10 +71,11 @@ public class SampleScene : MonoBehaviour
         }
 
         bool connectWait = true;
-        NetworkPeer newPeer = new NetworkPeer();
-        newPeer.EncryptKey = settings.GetKey();
-        newPeer.IsInitialConnect = true;
-        //newPeer.SetBufferSize(4, 4096, 8192);
+        NetworkPeer newPeer = new NetworkPeer
+        {
+            EncryptKey = settings.GetKey(),
+            IsInitialConnect = true
+        };
         newPeer.Connect(settings.GetDomain(), settings.port);
         newPeer.OnConnect = () =>
         {
@@ -82,8 +93,8 @@ public class SampleScene : MonoBehaviour
         networkHandler.AddPeer(newPeer);
 
         var ui = GameObject.Instantiate<ClientUI>(clientPrefab, uiRoot);
-        ui.SetID("#" + instance_id++);
-        ui.SetPeer(newPeer);
-        ui.Login();
+        var client = new ClientControl(ui, newPeer);
+        client.Login();
+        _clientControlList.Add(client);
     }
 }
