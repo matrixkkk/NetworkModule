@@ -1,108 +1,40 @@
-﻿using Assets.Scripts.ClientSide;
-using UnityEngine;
-using UnityEngine.UI;
+﻿using System;
 using System.Collections;
 using Assets.Scripts.Protocol;
+using ClientSide;
+using UnityEngine;
+using UnityEngine.UI;
 
-/// <summary>
-/// 클라이언트 UI
-/// </summary>
-public class ClientUI : MonoBehaviour
+namespace UI
 {
-    public Text txtID;
-    public Text txtPing;
-
-    private NetworkPeer peer;
-
-    private float lastPingSendTime = 0f;
-
-    private void Start()
-    {
-        StartCoroutine(PingLoop());
-    }
-
-    private void Update()
-    {
-        if(peer!= null && !peer.Connected)
-            GameObject.Destroy(gameObject);
-    }
-
-
-    public void SetID(string aID)
-    {
-        txtID.text = aID;
-        txtID.color = Color.red;
-    }
-
     /// <summary>
-    /// peer 등록
+    /// 클라이언트 UI
     /// </summary>
-    /// <param name="p"></param>
-    public void SetPeer(NetworkPeer p)
+    public class ClientUI : MonoBehaviour
     {
-        peer = p;
-        peer.OnReceive = this.OnReceivePacket;
-    }
+        public Text txtID;
+        public Text txtPing;
 
-    public void Login()
-    {
-        Login_Send send = new Login_Send()
+        public Action OnDisconnect { get; set; }
+
+        public void SetId(string id)
         {
-            id = txtID.text
-        };
-        peer.AddQueue(new Packet((ushort)PacketID.Login_Send, send.ToJson()));
-    }
-
-    public void OnClickDisconnect()
-    {
-        peer?.Disconnect();
-        GameObject.Destroy(gameObject);
-    }
-
-    public void OnReceivePacket(Packet p)
-    {
-        PacketID id = (PacketID)p.ID;
-        switch(id)
-        {
-            case PacketID.Login_Recv:
-                {
-                    Login_Recv recv = JsonUtility.FromJson<Login_Recv>(p.Str);
-                    if(!recv.IsError())
-                    {
-                        peer.SessionID = recv.session;
-                        txtID.color = Color.green;
-                    }
-                }
-                break;
-            case PacketID.Ping_Recv:
-                {
-                    Ping_Recv recv = JsonUtility.FromJson<Ping_Recv>(p.Str);
-                    if(!recv.IsError())
-                    {
-                        float delta = Time.realtimeSinceStartup - lastPingSendTime;
-                        txtPing.text = (int)(delta * 1000) + "ms";
-                    }
-                }
-                break;
+            txtID.text = id;
         }
-    }
 
-    IEnumerator PingLoop()
-    {
-        txtPing.text = "";
-        while (peer == null)
-            yield return null;
-
-        while (peer.Connected)
+        public void SetColor(Color color)
         {
-            yield return new WaitForSeconds(1f);
+            txtID.color = color;
+        }
 
-            if (!peer.HasSession)
-                continue;
+        public void SetPing(string ping)
+        {
+            txtPing.text = ping;
+        }
 
-            lastPingSendTime = Time.realtimeSinceStartup;
-            peer.AddQueue(PacketID.Ping_Send, new Login_Send());
-            peer.SendOut();
+        public void OnClickDisconnect()
+        {
+            OnDisconnect?.Invoke();
         }
     }
 }

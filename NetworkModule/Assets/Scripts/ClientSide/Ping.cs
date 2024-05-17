@@ -1,13 +1,12 @@
-﻿using System;
+using System;
+using Assets.Scripts.Protocol;
 using UnityEngine;
 
-namespace Assets.Scripts.Protocol
+namespace ClientSide
 {
     [Serializable]
-    public struct Login_Send : iSendMessage
+    public struct PingSend : iSendMessage
     {
-        public string id;
-
         public string ToJson()
         {
             return JsonUtility.ToJson(this);
@@ -15,10 +14,10 @@ namespace Assets.Scripts.Protocol
     }
 
     [Serializable]
-    public struct Login_Recv : iReceiveMessage
+    public struct PingReceive : iReceiveMessage
     {
-        public ulong session;
         public int error;
+        public string text;
 
         public bool IsError()
         {
