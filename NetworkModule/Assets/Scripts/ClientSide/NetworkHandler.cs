@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using ClientSide;
 using UnityEngine;
 
@@ -11,187 +12,165 @@ namespace Assets.Scripts.ClientSide
     /// </summary>
     public class NetworkHandler : MonoBehaviour
     {
-        private static string serverSettingAssetFile = "ServerSettings";         //서버 설정파일 이름
+        private const string SERVER_SETTING_ASSET_FILE = "ServerSettings";         //서버 설정파일 이름
 
+        private static NetworkHandler _instance;
+        public static NetworkHandler Instance
+        {
+            get => _instance;
+            set => _instance = value;
+        }
+        
+        private const int UPDATE_INTERVAL = 50;
 
-        private static NetworkHandler instance;
+        [SerializeField] private bool showLog = true;
+        
+        private bool _isAppQuits;                                         //앱 종료 여부
+        private bool _isMessageQueueRunning = true;                       //messageQueueRunning 처리 여부
+        private Stopwatch _timerToStopConnectionInBackground;             //백그라운드 연결 중지 시간 체크
+        private int _nextSendTickCount = 0;
+        private long _backgroundTimeout = 60000;                           //백그라운드 타임 아웃 시간 ms
 
-        protected internal static bool AppQuits;        //앱 종료 여부
+        private ServerSettings _settings;
+        private NetworkPeer _networkPeer;
 
-        private static bool isMessageQueueRunning = true;               //messageQueueRunning 처리 여부
-        private static Stopwatch timerToStopConnectionInBackground;     //백그라운드 연결 중지 시간 체크
-        private int nextSendTickCount = 0;
-        private int updateInterval = 50;                                  
-        private float backgroundTimeout = 60f;                           //백그라운드 타임 아웃 시간(60초)
-
-        private ServerSettings settings;
-        private List<NetworkPeer> peerList = new List<NetworkPeer>();
-
+        public bool IsAppQuits => _isAppQuits;
+        
         protected void Awake()
         {
-            if (instance != null && instance != this && instance.gameObject != null)
+            if (_instance != null && _instance != this && _instance.gameObject != null)
             {
-                GameObject.DestroyImmediate(instance.gameObject);
+                DestroyImmediate(_instance.gameObject);
             }
 
-            instance = this;
-            DontDestroyOnLoad(this.gameObject);
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
         }
 
         private void Start()
         {
-            if (settings == null)
+            if (_settings == null)
             {
-                settings = (ServerSettings)Resources.Load(serverSettingAssetFile, typeof(ServerSettings));
-                if (settings == null)
+                _settings = (ServerSettings)Resources.Load(SERVER_SETTING_ASSET_FILE, typeof(ServerSettings));
+                if (_settings == null)
                 {
-                    UnityEngine.Debug.LogError("Can't connect: Loading settings failed. ServerSettings asset must be in any 'Resources' folder as: " + serverSettingAssetFile);
+                    UnityEngine.Debug.LogError("Can't connect: Loading settings failed. ServerSettings asset must be in any 'Resources' folder as: " + SERVER_SETTING_ASSET_FILE);
                     return;
                 }
             }
 
-            backgroundTimeout = settings.backgroundTimeout;
+            _backgroundTimeout = _settings.backgroundTimeout;
         }
 
         protected void OnApplicationQuit()
         {
-            NetworkHandler.AppQuits = true;
+            _isAppQuits = true;
         }
 
         protected void OnApplicationPause(bool pause)
         {
-            if (backgroundTimeout > 0.1f)
+            if (_backgroundTimeout > 0.1f)
             {
-                if (timerToStopConnectionInBackground == null)
-                {
-                    timerToStopConnectionInBackground = new Stopwatch();
-                }
+                _timerToStopConnectionInBackground ??= new Stopwatch();
 
                 if (pause)
                 {
-                    timerToStopConnectionInBackground.Reset();
-                    timerToStopConnectionInBackground.Start();
+                    _timerToStopConnectionInBackground.Reset();
+                    _timerToStopConnectionInBackground.Start();
                 }
                 else
                 {
-                    timerToStopConnectionInBackground.Stop();
-                    UnityEngine.Debug.Log("OnApplicationPause : " + pause + " Pause time : " + timerToStopConnectionInBackground.Elapsed.TotalSeconds);
+                    _timerToStopConnectionInBackground.Stop();
+                }
+                if (showLog)
+                {
+                    UnityEngine.Debug.Log($"OnApplicationPause : {pause} , Pause time : {_timerToStopConnectionInBackground.Elapsed.TotalSeconds.ToString(CultureInfo.CurrentCulture)} sec");
                 }
             }
         }
 
-        protected void OnDestroy()
+        private void OnDestroy()
         {
-            foreach(var peer in peerList)
-            {
-                peer.Disconnect();
-            }
+            _networkPeer?.Disconnect();
         }
 
         protected void Update()
         {
 #if !UNITY_EDITOR
-        if(Application.internetReachability == NetworkReachability.NotReachable)
-        {
-            return;
-        }
+            if(Application.internetReachability == NetworkReachability.NotReachable)
+            {
+                return;
+            }
 #endif
 
-            if (peerList.Count == 0)
+            if (_networkPeer == null)
             {
                 return;
             }
 
-            if(isMessageQueueRunning)
+            if (_isMessageQueueRunning)
             {
-                foreach(var peer in peerList)
+                if (_networkPeer.State == ClientState.Disconnected ||
+                    (_networkPeer.State == ClientState.Connected && !_networkPeer.TcpSocket.Connected))
                 {
-                    if (peer.State == ClientState.Disconnected || (peer.State == ClientState.Connected && !peer.TcpSocket.Connected))
-                    {
-                        peer.State = ClientState.Disconnected;
-                        continue;
-                    }
-                    bool doRecv = true;
-                    while(isMessageQueueRunning && doRecv)
-                    {
-                        doRecv = peer.Dispatch();
-                    }
+                    _networkPeer.State = ClientState.Disconnected;
+                    return;
+                }
+
+                bool isDone = true;
+                while (isDone)
+                {
+                    isDone = _networkPeer.Dispatch();
                 }
             }
-            
 
             SendAck();
+            
+            int currentMsSinceStart = (int)(Time.realtimeSinceStartup * 1000);
+            if (currentMsSinceStart > _nextSendTickCount)
+            {
+                bool doSend = true;
+                while (_isMessageQueueRunning && doSend)
+                {
+                    doSend = _networkPeer.SendOut();
+                }
 
-            if (updateInterval > 0)
-            {
-                int currentMsSinceStart = (int)(Time.realtimeSinceStartup * 1000);
-                if (currentMsSinceStart > this.nextSendTickCount)
-                {
-                    foreach(var peer in peerList)
-                    {
-                        bool doSend = true;
-                        while (isMessageQueueRunning && doSend)
-                        {
-                            doSend = peer.SendOut();
-                        }
-                    }
-                    this.nextSendTickCount = currentMsSinceStart + this.updateInterval;
-                }
-            }
-            else
-            {
-                foreach (var peer in peerList)
-                {
-                    bool doSend = true;
-                    while (isMessageQueueRunning && doSend)
-                    {
-                        doSend = peer.SendOut();
-                    }
-                }
+                _nextSendTickCount = currentMsSinceStart + UPDATE_INTERVAL;
             }
         }
 
-        void SendAck()
+        private void SendAck()
         {
-            float currentTime = Time.realtimeSinceStartup;
-
-            if (timerToStopConnectionInBackground != null && backgroundTimeout > 0.1f)
+            if(_timerToStopConnectionInBackground == null || _networkPeer == null) return;
+            
+            if (_backgroundTimeout != 0 && _timerToStopConnectionInBackground.ElapsedMilliseconds > _backgroundTimeout)
             {
-                if (timerToStopConnectionInBackground.ElapsedMilliseconds > backgroundTimeout * 1000)
+                //peer가 단일일 경우만 처리
+                if (_networkPeer.Connected)
                 {
-                    //peer가 단일일 경우만 처리
-                    foreach (var peer in peerList)
-                    {
-                        if (peer.Connected)
-                        {
-                            peer.Disconnect();
-                        }
-                    }
-                    timerToStopConnectionInBackground.Stop();
-                    timerToStopConnectionInBackground.Reset();
-                    return;
+                    _networkPeer.Disconnect();
                 }
+                _timerToStopConnectionInBackground.Stop();
+                _timerToStopConnectionInBackground.Reset();
             }
-
-            /*foreach (var peer in peerList)
-            {
-                if(peer.IsSendAsk)
-                {
-                    if (currentTime - peer.LastSendOutTime > 60)
-                    {
-                        peer.SendAck();
-                    }
-                }
-            }*/
         }
 
         /// <summary>
-        /// peer 추가
+        /// peer 설정
         /// </summary>
         /// <param name="peer"></param>
-        public void AddPeer(NetworkPeer peer)
+        public void SetNetworkPeer(NetworkPeer peer)
         {
-            peerList.Add(peer);
+            _networkPeer = peer;
+        }
+        
+        /// <summary>
+        /// 메시지 큐 처리 여부
+        /// </summary>
+        /// <param name="set"></param>
+        public void SetMessageQueueRunning(bool set)
+        {
+            _isMessageQueueRunning = set;
         }
     }
 }
