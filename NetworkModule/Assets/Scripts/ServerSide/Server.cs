@@ -2,9 +2,11 @@
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using Assets.Scripts.ServerSide;
 using UnityEngine;
+using UnityEngine.Pool;
 
 namespace ServerSide
 {
@@ -15,7 +17,7 @@ namespace ServerSide
         /// </summary>
         private struct ReceivePacket
         {
-            public AsyncObject Owner;
+            public SocketObject Owner;
             public Assets.Scripts.Protocol.Packet Packet;
         }
 
@@ -29,22 +31,24 @@ namespace ServerSide
         private readonly object _packetLock = new object();    //packet lock
         private readonly object _asyncObjLock = new object();
 
-        private readonly List<AsyncObject> _asyncObjectList = new List<AsyncObject>();                //비동기 객체 리스트
-        private readonly Queue<ReceivePacket> _receivePacketQueue = new Queue<ReceivePacket>();           //받은 패킷 큐.
+        private ObjectPool<SocketObject> _objectPool;
+
+        private readonly List<SocketObject>    _socketObjectList = new List<SocketObject>();                //비동기 객체 리스트
+        private readonly Queue<ReceivePacket> _receivePacketQueue = new ();           //받은 패킷 큐.
 
         private byte[] _baseKey;                    //기본 암호화 키
         private byte[] _cryptoKey;                  //변하는 키
 
         private ulong _sessionID = 0;                //발급 세션 id
         private readonly object _sessionLock = new object();
-
+        
         #region [ properties ]
         public bool IsRunning => _isRunning;
 
         #endregion
 
         #region [ callbacks ]
-        public Action<string> AcceptCompleteCallback { get; set; }
+        public Action<string, SocketObject> AcceptCompleteCallback { get; set; }
         
         //message 콜백
         public Action<string> UserLoginCallback { get; set; } 
@@ -65,16 +69,28 @@ namespace ServerSide
         {
             lock (_packetLock)
             {
-                if (_receivePacketQueue.Count == 0) return;
+                if (_receivePacketQueue == null || _receivePacketQueue.Count == 0) return;
+            }
 
+            lock (_packetLock)
+            {
                 while (_receivePacketQueue.Count > 0)
                 {
-                    var p = _receivePacketQueue.Dequeue();
-                    ProcessPacket(p);
+                    if(_receivePacketQueue.TryDequeue(out var p))
+                    {
+                        Task.Run(() =>
+                        {
+                            ProcessPacket(p);
+                        });
+                    }
                 }
             }
         }
-
+        
+        /// <summary>
+        /// 비동기 패킷 처리
+        /// </summary>
+        /// <param name="p"></param>
         private void ProcessPacket(ReceivePacket p)
         {
             ReceiveId id = (ReceiveId)p.Packet.ID;
@@ -158,6 +174,7 @@ namespace ServerSide
         #region [ coroutine ]
         private async void ProcessPacketLoop()
         {
+            ThreadPool.SetMaxThreads(5, 5);
             while (_isRunning)
             {
                 Dispatch();
@@ -172,23 +189,20 @@ namespace ServerSide
             if (_bindSocket == null) return;
 
             Socket clientSocket = _bindSocket.EndAccept(ar);
+            
+            lock (_asyncObjLock)
+            {
+                var socketObject = _objectPool.Get();
+                socketObject.SetSocket(clientSocket);
+                socketObject.OnReceive = OnReceivePacket;
+                socketObject.OnCloseSocket = OnCloseSocket;
+                socketObject.ReceiveStart();
+                _socketObjectList.Add(socketObject);
+                AcceptCompleteCallback?.Invoke(clientSocket.RemoteEndPoint.ToString(), socketObject);
+            }
 
             //다시 대기
             _bindSocket.BeginAccept(OnAccept, null);
-
-            AsyncObject asyncObj = new AsyncObject(clientSocket, RECEIVE_BUFFER_SIZE, _baseKey)
-            {
-                OnReceive = OnReceivePacket,
-                OnCloseSocket = OnCloseSocket
-            };
-
-            asyncObj.ReceiveStart();
-            lock (_asyncObjLock)
-            {
-                _asyncObjectList.Add(asyncObj);
-            }
-
-            AcceptCompleteCallback?.Invoke(clientSocket.RemoteEndPoint.ToString());
         }
 
         /// <summary>
@@ -197,16 +211,15 @@ namespace ServerSide
         /// </summary>
         /// <param name="p">패킷</param>
         /// <param name="owner">패킷 받은 주체</param>
-        private void OnReceivePacket(Assets.Scripts.Protocol.Packet p, AsyncObject owner)
+        private void OnReceivePacket(Assets.Scripts.Protocol.Packet p, SocketObject owner)
         {
+            var receivePacket = new ReceivePacket
+            {
+                Owner = owner,
+                Packet = p
+            };
             lock (_packetLock)
             {
-                var receivePacket = new ReceivePacket
-                {
-                    Owner = owner,
-                    Packet = p
-                };
-
                 _receivePacketQueue.Enqueue(receivePacket);
             }
         }
@@ -215,16 +228,22 @@ namespace ServerSide
         /// 소켓 close 콜백
         /// </summary>
         /// <param name="owner"></param>
-        private void OnCloseSocket(AsyncObject owner)
+        private void OnCloseSocket(SocketObject owner)
         {
             lock(_asyncObjLock)
             {
-                _asyncObjectList.Remove(owner);
+                _socketObjectList.Remove(owner);
             }
         }
         #endregion
 
         #region [ public ]
+
+        public void Initialize()
+        {
+            _objectPool = new ObjectPool<SocketObject>(() => new SocketObject(RECEIVE_BUFFER_SIZE, _baseKey),
+                actionOnRelease: o => o.Reset());
+        }
 
 
         public void StartServer()
@@ -255,9 +274,12 @@ namespace ServerSide
 
             _isRunning = false;
 
-            foreach (AsyncObject obj in _asyncObjectList)
+            lock (_asyncObjLock)
             {
-                obj.Close();
+                foreach (var obj in _socketObjectList)
+                {
+                    obj.Close();
+                }
             }
         }
         #endregion

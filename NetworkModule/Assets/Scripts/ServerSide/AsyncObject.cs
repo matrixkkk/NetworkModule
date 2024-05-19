@@ -7,57 +7,64 @@ using UnityEngine;
 
 namespace Assets.Scripts.ServerSide
 {
-    public class AsyncObject
+    /// <summary>
+    /// 소켓 객체
+    /// </summary>
+    public class SocketObject
     {
         private const int HEADER_SIZE = 16;
 
-        public Socket socket;
-        public readonly int bufferSize;
+        private Socket _socket;
+        private readonly byte[] _buffer;
 
-        public byte[] buffer;
-        public byte[] outBuffer;
+        private Header _header;                  //받은 헤더 정보
+        private bool _receiveHeader = true;         //헤더 받음.
 
-        //private GameServer gameServer;
+        private int _receiveOffset;
+        private int _receiveSize;
+        private readonly byte[] _key;
+        private readonly byte[] _iv;
+        private ushort _seq;
+        private ulong _sessionID;
 
-        private Header header;                  //받은 헤더 정보
-        private bool recvHeader = true;         //헤더 받음.
+        private bool _isError;
+        private string _errorText;
+        public bool IsError => _isError;
+        public string ErrorText => _errorText;
 
-        private byte[] headerBytes;
-        private int recvOffset;
-        private int recvSize;
-        private byte[] key;
-        private byte[] iv;
-        private ushort seq = 0;
-        private ulong sessionID;
-        private byte[] sendBuffer;
-
-        public delegate void OnReceivePacketCallback(Packet p, AsyncObject target);
+        public delegate void OnReceivePacketCallback(Packet p, SocketObject target);
 
         public OnReceivePacketCallback OnReceive { get; set; }
-        public delegate void OnSocketCloseCallback(AsyncObject owner);
+        public delegate void OnSocketCloseCallback(SocketObject owner);
         public OnSocketCloseCallback OnCloseSocket { get; set; }
 
-        public ulong SessionID => sessionID;
+        public ulong SessionID => _sessionID;
 
 
-        public AsyncObject(Socket aSocket, int aBufferSize, byte[] aKey)
+        public SocketObject(int bufferSize, byte[] aKey)
         {
-            socket = aSocket;
-            bufferSize = aBufferSize;
-            buffer = new byte[aBufferSize];
-            outBuffer = new byte[aBufferSize];
-            sendBuffer = new byte[aBufferSize];
+            _buffer = new byte[bufferSize];
+            _receiveOffset = 0;
+            _key = aKey;
+            _sessionID = 0;
+            _iv = new byte[16];
+        }
 
-            headerBytes = new byte[HEADER_SIZE];
-            recvOffset = 0;
-            key = aKey;
-            sessionID = 0;
-            iv = new byte[16];
+        public void Reset()
+        {
+            _receiveOffset = 0;
+            _sessionID = 0;
+            _socket = null;
+        }
+
+        public void SetSocket(Socket socket)
+        {
+            _socket = socket;
         }
 
         public void SetSessionID(ulong id)
         {
-            sessionID = id;
+            _sessionID = id;
         }
 
         /// <summary>
@@ -65,148 +72,126 @@ namespace Assets.Scripts.ServerSide
         /// </summary>
         public void ReceiveStart()
         {
-            socket.BeginReceive(buffer, 0, HEADER_SIZE, SocketFlags.None, new AsyncCallback(ReceiveCallback), this);
+            _socket.BeginReceive(_buffer, 0, HEADER_SIZE, SocketFlags.None, ReceiveCallback, this);
         }
 
         public void Close()
         {
-            socket.Close();
+            _socket.Close();
         }
 
-        public void ReceiveCallback(IAsyncResult asyncResult)
+        private void ReceiveCallback(IAsyncResult asyncResult)
         {
             //주 스레드가 아님
-            AsyncObject asyncObj = (AsyncObject)asyncResult.AsyncState;
+            SocketObject asyncObj = (SocketObject)asyncResult.AsyncState;
 
-            if (asyncObj.socket == null ||
-                !asyncObj.socket.Connected) return;
+            if (asyncObj._socket == null ||
+                !asyncObj._socket.Connected) return;
 
-            int size = asyncObj.socket.EndReceive(asyncResult);
+            int size = asyncObj._socket.EndReceive(asyncResult);
             if (size == 0)
             {
-                //socket close;
                 OnCloseSocket?.Invoke(this);
             }
             else
             {
-                if (recvHeader)
+                if (_receiveHeader)
                 {
-                    RecvHeader(size);
+                    ReceiveHeader(size);
                 }
                 else
                 {
-                    RecvBody(size);
+                    ReceiveBody(size);
                 }
             }
         }
 
-        private void RecvHeader(int size)
+        private void ReceiveHeader(int size)
         {
-            recvOffset += size;
-            if (recvOffset < HEADER_SIZE)
+            _receiveOffset += size;
+            if (_receiveOffset < HEADER_SIZE)
             {
-                socket.BeginReceive(buffer, recvOffset, HEADER_SIZE - recvOffset, SocketFlags.None, new AsyncCallback(ReceiveCallback), this);
+                _socket.BeginReceive(_buffer, _receiveOffset, HEADER_SIZE - _receiveOffset, SocketFlags.None,  ReceiveCallback, this);
             }
             else
             {
-                header = new Header(buffer);
-                recvHeader = false;
-                recvSize = (int)(header.size - HEADER_SIZE);
+                _header = new Header(_buffer);
+                _receiveHeader = false;
+                _receiveSize = (int)(_header.size - HEADER_SIZE);
 
-                Array.Clear(buffer, 0, buffer.Length);
+                Array.Clear(_buffer, 0, _buffer.Length);
                 //body 받음
-                socket.BeginReceive(buffer, 0, recvSize, SocketFlags.None, new AsyncCallback(ReceiveCallback), this);
-                recvOffset = 0;
+                _socket.BeginReceive(_buffer, 0, _receiveSize, SocketFlags.None, ReceiveCallback, this);
+                _receiveOffset = 0;
             }
         }
-        private void RecvBody(int size)
+        private void ReceiveBody(int size)
         {
-            recvOffset += size;
-            if (recvOffset < recvSize)
+            _receiveOffset += size;
+            if (_receiveOffset < _receiveSize)
             {
-                socket.BeginReceive(buffer, recvOffset, recvSize - recvOffset, SocketFlags.None, new AsyncCallback(ReceiveCallback), this);
+                _socket.BeginReceive(_buffer, _receiveOffset, _receiveSize - _receiveOffset, SocketFlags.None, ReceiveCallback, this);
             }
             else
             {
-                if (sessionID > 0)
+                if (_sessionID > 0)
                 {
-                    UInt64 high = sessionID;
-                    UInt64 low = header.seq;
-                    Buffer.BlockCopy(BitConverter.GetBytes(high), 0, iv, 0, 8);
-                    Buffer.BlockCopy(BitConverter.GetBytes(low), 0, iv, 8, 8);
+                    UInt64 high = _sessionID;
+                    UInt64 low = _header.seq;
+                    Buffer.BlockCopy(BitConverter.GetBytes(high), 0, _iv, 0, 8);
+                    Buffer.BlockCopy(BitConverter.GetBytes(low), 0, _iv, 8, 8);
                 }
                 else
                 {
-                    Array.Clear(iv, 0, iv.Length);
+                    Array.Clear(_iv, 0, _iv.Length);
                 }
-                byte[] bytes = AES128.Decrypt(buffer, 0, recvSize, key);
+                byte[] bytes = AES128.Decrypt(_buffer, 0, _receiveSize, _key);
                
                 uint crc = CRC32.GetCRC(bytes, bytes.Length);
-                var pid = System.BitConverter.GetBytes(header.pId);
-                var seq = System.BitConverter.GetBytes(header.seq);
+                var pid = BitConverter.GetBytes(_header.pId);
+                var seq = BitConverter.GetBytes(_header.seq);
                 crc = CRC32.GetCRC(pid, pid.Length, crc);
                 crc = CRC32.GetCRC(seq, seq.Length, crc);
-                if (crc != header.crc)
+                if (crc != _header.crc)
                 {
-                    Console.WriteLine("CRC error : " + header.pId);
                     return;
                 }
 
                 string byteToString = System.Text.Encoding.UTF8.GetString(bytes, 0, bytes.Length);
 
-                Packet newPacket = new Packet(header, byteToString);
+                Packet newPacket = new Packet(_header, byteToString);
                 OnReceive?.Invoke(newPacket, this);
 
-                recvOffset = 0;
-                recvHeader = true;
+                _receiveOffset = 0;
+                _receiveHeader = true;
                 ReceiveStart();
             }
         }
 
-        private void Decrypt(byte[] input, int offset, int inputSize, byte[] output, byte[] key, byte[] iv)
-        {
-            RijndaelManaged RijndaelCipher = new RijndaelManaged();
-
-            RijndaelCipher.Key = key;
-            //RijndaelCipher.IV = iv;
-            RijndaelCipher.Mode = CipherMode.ECB;
-            RijndaelCipher.Padding = PaddingMode.PKCS7;
-
-            ICryptoTransform dectryption = RijndaelCipher.CreateDecryptor();
-
-            //using (MemoryStream msEncrypt = new MemoryStream(output))
-            //{
-            //    using (CryptoStream cs = new CryptoStream(msEncrypt, dectryption, CryptoStreamMode.Write))
-            //    {
-            //        cs.Write(input, offset, inputSize);
-            //    }
-            //}
-
-            output = dectryption.TransformFinalBlock(input, offset, inputSize);
-        }
-
         public void Send(ushort id, string jsonStr)
         {
-            Packet p = new Packet(id, jsonStr);
+            Packet p = new Packet(id, jsonStr)
+            {
+                Seq = _seq++
+            };
 
-            p.Seq = seq++;
-            UInt64 high = sessionID;
-            UInt64 low = seq;
-            Buffer.BlockCopy(BitConverter.GetBytes(high), 0, iv, 0, 8);
-            Buffer.BlockCopy(BitConverter.GetBytes(low), 0, iv, 8, 8);
+            UInt64 high = _sessionID;
+            UInt64 low = _seq;
+            Buffer.BlockCopy(BitConverter.GetBytes(high), 0, _iv, 0, 8);
+            Buffer.BlockCopy(BitConverter.GetBytes(low), 0, _iv, 8, 8);
 
             //패킷 전송
-            int size = p.ToByte(buffer, key, iv, true);
+            int size = p.ToByte(_buffer, _key, _iv, true);
 
             try
             {
-                socket.BeginSend(buffer, 0, size, SocketFlags.None, new AsyncCallback(CallbackSendResult), socket);
+                _socket.BeginSend(_buffer, 0, size, SocketFlags.None, CallbackSendResult, _socket);
             }
             catch (SocketException e)
             {
-                Debug.LogError("socket BeginSend Error : " + e.Message);
+                _isError = true;
+                _errorText = $"socket BeginSend Error : {e.Message}";
             }
-            Debug.Log("[Server] Send - " + "[" + p.ID + "] : " + jsonStr);
         }
 
         private void CallbackSendResult(IAsyncResult result)
@@ -219,7 +204,8 @@ namespace Assets.Scripts.ServerSide
             }
             catch (SocketException e)
             {
-                Debug.LogError("[Server] : " + e.Message);
+                _isError = true;
+                _errorText = $"send error : {e.Message}";
             }
         }
     }
