@@ -15,14 +15,14 @@ namespace ServerSide
         /// </summary>
         private struct ReceivePacket
         {
-            public AsyncObject owner;
-            public Assets.Scripts.Protocol.Packet packet;
+            public AsyncObject Owner;
+            public Assets.Scripts.Protocol.Packet Packet;
         }
 
         private const int PORT = 20000;
         private readonly AddressFamily _addressFamily = AddressFamily.InterNetwork;
-        private readonly int _listenCount = 10;
-        private readonly int _receiveBufferSize = 4096;
+        private const int LISTEN_COUNT = 10;
+        private const int RECEIVE_BUFFER_SIZE = 4096;
 
         private Socket _bindSocket;                   //bind 소켓
         private bool _isRunning = false;            //서버 구동중
@@ -44,18 +44,17 @@ namespace ServerSide
         #endregion
 
         #region [ callbacks ]
-        public delegate void OnAccept(string address);
-        private OnAccept mOnAccept;
-        public OnAccept OnAcceptCallback { set => mOnAccept = value; }
-   
+        public Action<string> AcceptCompleteCallback { get; set; }
+        
+        //message 콜백
+        public Action<string> UserLoginCallback { get; set; } 
         #endregion
 
         #region [ private ]
 
-
         private void Accept()
         {
-            _bindSocket.BeginAccept(AcceptCallback, null);
+            _bindSocket.BeginAccept(OnAccept, null);
             _isRunning = true;
         }
 
@@ -78,17 +77,17 @@ namespace ServerSide
 
         private void ProcessPacket(ReceivePacket p)
         {
-            ReceiveId id = (ReceiveId)p.packet.ID;
+            ReceiveId id = (ReceiveId)p.Packet.ID;
             switch (id)
             {
                 case ReceiveId.Login:
                 {
-                    LoginReceive login = JsonUtility.FromJson<LoginReceive>(p.packet.Str);
+                    LoginReceive login = JsonUtility.FromJson<LoginReceive>(p.Packet.Str);
 
-                    Debug.Log("[Server] Login : " + login.id);
+                    UserLoginCallback?.Invoke(login.id);
 
                     ulong sessionID = IssueSessionID();
-                    p.owner.SetSessionID(sessionID);
+                    p.Owner.SetSessionID(sessionID);
 
                     //로그인 검증 후 -
                     //성공 패킷 다시 보냄.
@@ -97,8 +96,8 @@ namespace ServerSide
                         session = sessionID,
                         error = 0
                     };
-                    ushort receiveId = (ushort)(p.packet.ID + 1);
-                    p.owner.Send(receiveId, send.ToJson());
+                    ushort receiveId = (ushort)(p.Packet.ID + 1);
+                    p.Owner.Send(receiveId, send.ToJson());
                     break;
                 }
                 case ReceiveId.Ping:
@@ -109,8 +108,8 @@ namespace ServerSide
                     {
                         error = 0
                     };
-                    ushort receiveId = (ushort)(p.packet.ID + 1);
-                    p.owner.Send(receiveId, receive.ToJson());
+                    ushort receiveId = (ushort)(p.Packet.ID + 1);
+                    p.Owner.Send(receiveId, receive.ToJson());
                     break;
                 }
             }
@@ -168,17 +167,16 @@ namespace ServerSide
         #endregion
 
         #region [ callbacks ]
-        private void AcceptCallback(IAsyncResult ar)
+        private void OnAccept(IAsyncResult ar)
         {
             if (_bindSocket == null) return;
 
             Socket clientSocket = _bindSocket.EndAccept(ar);
 
             //다시 대기
-            _bindSocket.BeginAccept(AcceptCallback, null);
-            Debug.Log("Accept : " + clientSocket.RemoteEndPoint.ToString());        
+            _bindSocket.BeginAccept(OnAccept, null);
 
-            AsyncObject asyncObj = new AsyncObject(clientSocket, _receiveBufferSize, _baseKey)
+            AsyncObject asyncObj = new AsyncObject(clientSocket, RECEIVE_BUFFER_SIZE, _baseKey)
             {
                 OnReceive = OnReceivePacket,
                 OnCloseSocket = OnCloseSocket
@@ -190,7 +188,7 @@ namespace ServerSide
                 _asyncObjectList.Add(asyncObj);
             }
 
-            mOnAccept?.Invoke(clientSocket.RemoteEndPoint.ToString());
+            AcceptCompleteCallback?.Invoke(clientSocket.RemoteEndPoint.ToString());
         }
 
         /// <summary>
@@ -205,8 +203,8 @@ namespace ServerSide
             {
                 var receivePacket = new ReceivePacket
                 {
-                    owner = owner,
-                    packet = p
+                    Owner = owner,
+                    Packet = p
                 };
 
                 _receivePacketQueue.Enqueue(receivePacket);
@@ -235,21 +233,16 @@ namespace ServerSide
             {
                 return;
             }
-            Debug.Log("Start Server");
-
             CreateCryptoKey();
 
             _bindSocket = new Socket(_addressFamily, SocketType.Stream, ProtocolType.IP);
-            if (_bindSocket != null)
-            {
-                //바인딩
-                var ipEndPoint = new IPEndPoint(IPAddress.Any, PORT);
-                _bindSocket.Bind(ipEndPoint);
-                _bindSocket.Listen(_listenCount);
+            //바인딩
+            var ipEndPoint = new IPEndPoint(IPAddress.Any, PORT);
+            _bindSocket.Bind(ipEndPoint);
+            _bindSocket.Listen(LISTEN_COUNT);
 
-                Accept();
-                ProcessPacketLoop();
-            }
+            Accept();
+            ProcessPacketLoop();
         }
 
 
@@ -257,7 +250,6 @@ namespace ServerSide
         {
             if (_bindSocket == null) return;
 
-            Debug.Log("End Server");
             _bindSocket.Close();
             _bindSocket = null;
 

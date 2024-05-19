@@ -211,9 +211,9 @@ namespace ClientSide
             _sendPacketQueue.Enqueue(p);
         }
 
-        public void AddQueue(PacketId id, iSendMessage msg)
+        public void AddQueue(PacketId id, string json)
         {
-            _sendPacketQueue.Enqueue(new Packet((ushort)id, msg.ToJson()));
+            _sendPacketQueue.Enqueue(new Packet((ushort)id, json));
         }
 
         /// <summary>
@@ -262,7 +262,6 @@ namespace ClientSide
                 _stream = tcp.GetStream();
 
                 Debug.Log("Connect success : " + DateTime.Now.ToString(CultureInfo.InvariantCulture));
-                //ReadHeader();
                 ReadStream(true);
                 OnConnect?.Invoke();
             }
@@ -389,9 +388,9 @@ namespace ClientSide
 
             try
             {
-                _tcpSocket.Client.Shutdown(SocketShutdown.Both);
-                _tcpSocket.Client.BeginDisconnect(false, new AsyncCallback(CallbackDisconnect), this);
                 _clientState = ClientState.Disconnecting;
+                _tcpSocket.Client.Shutdown(SocketShutdown.Both);
+                _tcpSocket.Client.BeginDisconnect(false, CallbackDisconnect, this);
             }
             catch (Exception e)
             {
@@ -512,7 +511,7 @@ namespace ClientSide
                 if (_tcpSocket.Connected && _stream != null)
                 {
                     receiveSize = _stream.EndRead(asyncResult);
-                    Debug.Log($"Receive size : {receiveSize}");
+                    //Debug.Log($"Receive size : {receiveSize}");
                 }
                 else
                 {

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace Assets.Scripts.ClientSide
 {
@@ -11,16 +12,9 @@ namespace Assets.Scripts.ClientSide
     [CreateAssetMenu(fileName = "ServerSettings", menuName = "ScriptableObjects/ServerSettings")]
     public class ServerSettings : ScriptableObject
     {
-        public enum eServerType
-        {
-            None,
-            DEV,
-        }
-        public eServerType serverType;
         public int port;
-
-        public string devServerDomain;
-        public float backgroundTimeout = 60.0f;     //background timeout(60초)
+        [FormerlySerializedAs("devServerDomain")] public string serverDomain;
+        public long backgroundTimeout = 600000;     //background timeout(60초) ms 단위
 
 
         #region [ 암호화 키 ]
@@ -43,15 +37,14 @@ namespace Assets.Scripts.ClientSide
         /// <summary>
         /// 초기화
         /// </summary>
-        public void Initialize()
+        private void Initialize()
         {
             List<byte> byteList = new List<byte>();
 
             for (int i = 0; i < fakeKey.Length; i++)
             {
-                short fake = fakeKey[i];
                 short xor = xorKey[i];
-                byteList.Add((byte)(fake ^= xor));
+                byteList.Add((byte)(fakeKey[i] ^ xor));
             }
 
             mKey = byteList.ToArray();
@@ -68,12 +61,7 @@ namespace Assets.Scripts.ClientSide
 
         public string GetDomain()
         {
-            if (serverType == eServerType.DEV)
-            {
-                return devServerDomain;
-            }
-            return "";
+            return serverDomain;
         }
     }
-
 }
