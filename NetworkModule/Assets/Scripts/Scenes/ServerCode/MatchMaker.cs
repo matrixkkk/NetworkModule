@@ -14,8 +14,10 @@ namespace Scenes
         private readonly object _lock = new object();
         private readonly List<RoomInfo> _roomList = new List<RoomInfo>();   //룸 목록
         private readonly Dictionary<long, RoomInfo> _userRoomDic = new Dictionary<long, RoomInfo>(); //유저 룸 매핑
+        private int _roomNumberId;
 
         public Action<string> OnError { get; set; }
+        public Action<string> OnMessage { get; set; }
         
         /// <summary>
         /// 유저 입장
@@ -36,10 +38,16 @@ namespace Scenes
                         return;
                     }
                  
-                    var newRoom = new RoomInfo();
+                    var newRoom = new RoomInfo
+                    {
+                        RoomNumber = ++_roomNumberId
+                    };
                     newRoom.AddUser(user);
                     _roomList.Add(newRoom);
                     _userRoomDic.TryAdd(user.Id, newRoom);
+                    
+                    OnMessage?.Invoke($"Create Room : {newRoom.RoomNumber.ToString()}");
+                    user.EnterRoom(newRoom.RoomNumber);
                 }
             });
         }

@@ -32,11 +32,11 @@ namespace ClientSide
     /// </summary>
     public class NetworkPeer
     {
-        private int _streamBufferSize = 8192;                 //스트림 버퍼 사이즈 8k
-        private int _receiveBufferSize = 4096;                //리시브 버퍼 사이즈 4k
-        private int _sendBufferSize = 4096;
-        private int _headerSize = 16;                           //헤더사이즈
-        private int _packetSizeOffset = 8;                      //패킷 사이즈를 나타내는 바이트 오프셋
+        private const int _streamBufferSize = 8192;                 //스트림 버퍼 사이즈 8k
+        private const int _receiveBufferSize = 4096;                //리시브 버퍼 사이즈 4k
+        private const int _sendBufferSize = 4096;
+        private const int _headerSize = 16;                           //헤더사이즈
+        private const int _packetSizeOffset = 8;                      //패킷 사이즈를 나타내는 바이트 오프셋
 
         private TcpClient _tcpSocket;                           //네트워크 소켓
         private NetworkStream _stream = null;                   //네트워크 스트림
@@ -56,14 +56,10 @@ namespace ClientSide
 
         private byte[] _key;                               //암호화 키
         private readonly byte[] _iv = new byte[16];                 //iv
-        private ulong _sessionID;                         //세션 ID
 
         private bool _isInitializeConnect = false;      //초기화 여부
         private bool _isSendAsk = false;
         private ClientState _clientState = ClientState.UnInitialized;                           //클라이언트 상태
-
-        public int HeaderSize { set => _headerSize = value; }
-        public int PacketSizeOffset { set => _packetSizeOffset = value; }
 
         #region callbacks
         public delegate void OnConnectCallback();
@@ -80,13 +76,9 @@ namespace ClientSide
             get => _isInitializeConnect;
             set => _isInitializeConnect = value;
         }
-        public ulong SessionID { set => _sessionID = value; }
-        public bool HasSession => _sessionID != 0;
-        public bool IsSendAsk 
-        { 
-            get => _isSendAsk;
-            set => _isSendAsk = value;
-        }
+        public ulong SessionID { get; set; }
+        
+        public bool HasSession => SessionID != 0;
 
         public ClientState State 
         { 
@@ -331,9 +323,9 @@ namespace ClientSide
         /// </summary>
         private void GenerateAES_IV(ushort seq)
         {
-            if (_sessionID > 0)
+            if (SessionID > 0)
             {
-                UInt64 high = _sessionID;
+                UInt64 high = SessionID;
                 UInt64 low = seq;
                 Buffer.BlockCopy(BitConverter.GetBytes(high), 0, _iv, 0, 8);
                 Buffer.BlockCopy(BitConverter.GetBytes(low), 0, _iv, 8, 8);
@@ -382,7 +374,7 @@ namespace ClientSide
         /// </summary>
         public void Disconnect()
         {
-            _sessionID = 0;
+            SessionID = 0;
             if (_tcpSocket is not { Connected: true }) return;
             OnDisconnect?.Invoke();
 

@@ -1,5 +1,6 @@
 using System;
 using Assets.Scripts.ServerSide;
+using ServerSide;
 
 namespace Scenes
 {
@@ -9,14 +10,16 @@ namespace Scenes
     /// </summary>
     public class UserController
     {
-        private long instanceID;
+        private long _instanceID;
         private SocketObject _socketObject;
+
+        private int _roomId = -1;  //-1인 경우 룸 없는 상태
         
         public Action<SocketObject> ReleaseCallback { get; set; } 
         public long Id
         {
-            get => instanceID;
-            set => instanceID = value;
+            get => _instanceID;
+            set => _instanceID = value;
         }
         
         /// <summary>
@@ -31,6 +34,21 @@ namespace Scenes
         public void Clear()
         {
             ReleaseCallback?.Invoke(_socketObject);
+        }
+    
+        /// <summary>
+        /// 룸 입장
+        /// </summary>
+        /// <param name="roomId"></param>
+        public void EnterRoom(int roomId)
+        {
+            _roomId = roomId;
+                    
+            EnterRoomSend send = new EnterRoomSend()
+            {
+                roomNumber = roomId,
+            };
+            _socketObject.Send((ushort)SendId.EnterRoom, send.ToJson());
         }
     }
 }

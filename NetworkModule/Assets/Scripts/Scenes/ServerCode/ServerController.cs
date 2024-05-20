@@ -3,6 +3,8 @@ using System.Globalization;
 using System.Text;
 using Assets.Scripts.ServerSide;
 using Scenes.Server;
+using UnityEditor.UIElements;
+using UnityEngine;
 using UnityEngine.Pool;
 
 namespace Scenes.ServerCode
@@ -43,6 +45,9 @@ namespace Scenes.ServerCode
             
             _server.Initialize();
             _userPool = new ObjectPool<UserController>(() => new UserController());
+
+            _matchMaker.OnError = OnError;
+            _matchMaker.OnMessage = OnMessage;
         }
 
         private void RunServer()
@@ -57,7 +62,7 @@ namespace Scenes.ServerCode
             _server.EndServer();
         }
 
-        private void SetText(string text)
+        private void SetText(string text, bool error = false)
         {
             if (CONSOLE_MAX_COUNT < _consoleLineCount)
             {
@@ -70,12 +75,30 @@ namespace Scenes.ServerCode
                 _consoleLineCount -= 5;
             }
             //시간 추가
-            _consoleText.AppendLine($"[{DateTime.Now.ToString(CultureInfo.CurrentCulture)}] {text}");
+            _consoleText.AppendLine(!error
+                ? $"[{DateTime.Now.ToString(CultureInfo.CurrentCulture)}] {text}"
+                : $"<color=red>[{DateTime.Now.ToString(CultureInfo.CurrentCulture)}] {text}</color>");
             _consoleLineCount++;
             _serverView.ConsoleText.text = _consoleText.ToString();
         }
 
         #region EventReceiver
+
+        private void OnMessage(string msg)
+        {
+            UnityMainThreadDispatcher.Instance.Enqueue(() =>
+            {
+                SetText(msg);
+            });
+        }
+
+        private void OnError(string error)
+        {
+            UnityMainThreadDispatcher.Instance.Enqueue(() =>
+            {
+                SetText(error, true);
+            });
+        }
 
         private void OnClickRun()
         {
