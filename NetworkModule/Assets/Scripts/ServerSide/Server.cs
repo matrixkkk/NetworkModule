@@ -29,7 +29,7 @@ namespace ServerSide
         private Socket _bindSocket;                   //bind 소켓
         private bool _isRunning = false;            //서버 구동중
         private readonly object _packetLock = new object();    //packet lock
-        private readonly object _asyncObjLock = new object();
+        private readonly object _socketObjLock = new object();
 
         private ObjectPool<SocketObject> _objectPool;
 
@@ -190,7 +190,7 @@ namespace ServerSide
 
             Socket clientSocket = _bindSocket.EndAccept(ar);
             
-            lock (_asyncObjLock)
+            lock (_socketObjLock)
             {
                 var socketObject = _objectPool.Get();
                 socketObject.SetSocket(clientSocket);
@@ -230,7 +230,7 @@ namespace ServerSide
         /// <param name="owner"></param>
         private void OnCloseSocket(SocketObject owner)
         {
-            lock(_asyncObjLock)
+            lock(_socketObjLock)
             {
                 _socketObjectList.Remove(owner);
             }
@@ -274,12 +274,22 @@ namespace ServerSide
 
             _isRunning = false;
 
-            lock (_asyncObjLock)
+            lock (_socketObjLock)
             {
                 foreach (var obj in _socketObjectList)
                 {
                     obj.Close();
                 }
+            }
+        }
+        
+        public void RemoveSocketObject(SocketObject obj)
+        {
+            lock (_socketObjLock)
+            {
+                obj.Close();
+                _socketObjectList.Remove(obj);
+                _objectPool.Release(obj);
             }
         }
         #endregion

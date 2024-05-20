@@ -22,8 +22,8 @@ namespace Scenes.ServerCode
         private int _consoleLineCount = 0;
         
         private ObjectPool<UserController> _userPool;
+        private long _instanceId = 0;
 
-        
         public ServerController(ServerView view, ServerSide.Server server)
         {
             _serverView = view;
@@ -101,6 +101,15 @@ namespace Scenes.ServerCode
             {
                 SetText($"Accept : {ip}");
             });
+
+            var user = _userPool.Get();
+            user.SetAsyncObject(socketObject);
+            user.Id = ++_instanceId;
+            user.ReleaseCallback = (socketObj) =>
+            {
+                _server.RemoveSocketObject(socketObj);
+            };
+            _matchMaker.EnterUser(user);
         }
         
         /// <summary>
