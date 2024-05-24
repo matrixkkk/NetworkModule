@@ -12,16 +12,25 @@ namespace Scenes
     {
         private long _instanceID;
         private SocketObject _socketObject;
-
+        private string _userId;
         private int _roomId = -1;  //-1인 경우 룸 없는 상태
         
+        public long InstanceID => _instanceID;
         public Action<SocketObject> ReleaseCallback { get; set; } 
         public long Id
         {
             get => _instanceID;
             set => _instanceID = value;
         }
-        
+
+        public string UserId
+        {
+            get => _userId;
+            set => _userId = value;
+        }
+
+        public SocketObject SocketObj => _socketObject;
+
         /// <summary>
         /// 소켓 오브젝트 설정
         /// </summary>
@@ -31,11 +40,6 @@ namespace Scenes
             _socketObject = obj;
         }
 
-        public void Clear()
-        {
-            ReleaseCallback?.Invoke(_socketObject);
-        }
-    
         /// <summary>
         /// 룸 입장
         /// </summary>

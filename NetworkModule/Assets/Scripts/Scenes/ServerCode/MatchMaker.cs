@@ -35,6 +35,8 @@ namespace Scenes
                     
                         room.AddUser(user);
                         _userRoomDic.TryAdd(user.Id, room);
+                        user.EnterRoom(room.RoomNumber);
+                        OnMessage?.Invoke($"Enter room : {room.RoomNumber.ToString()}");
                         return;
                     }
                  

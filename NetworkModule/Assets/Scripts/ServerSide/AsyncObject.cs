@@ -29,8 +29,10 @@ namespace Assets.Scripts.ServerSide
 
         private bool _isError;
         private string _errorText;
+
         public bool IsError => _isError;
         public string ErrorText => _errorText;
+        public long InstanceId { get; set; }
 
         public delegate void OnReceivePacketCallback(Packet p, SocketObject target);
 

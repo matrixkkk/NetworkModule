@@ -24,6 +24,10 @@ namespace Scenes.ClientScene
             networkHandler.SetNetworkPeer(networkPeer);
             _clientControl = new ClientControl(clientView, networkPeer);
             _clientControl.SetDomain(settings.serverDomain, settings.port);
+            _clientControl.OnEnterRoomPacket = (roomNumber) =>
+            {
+                Debug.Log($"Enter Room: {roomNumber.ToString()}");
+            };
         }
 
         private void Update()

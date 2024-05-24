@@ -11,7 +11,7 @@ namespace ClientSide
 
         public bool IsError()
         {
-            return roomNumber != -1;
+            return roomNumber == -1;
         }
 
         public string ToJson()

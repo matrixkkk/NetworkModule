@@ -1,7 +1,9 @@
+using System;
 using System.Globalization;
 using System.Threading.Tasks;
 using Assets.Scripts.Protocol;
 using ClientSide;
+using Scenes.Server;
 using UnityEngine;
 
 namespace Scenes.ClientScene
@@ -25,6 +27,8 @@ namespace Scenes.ClientScene
         private string _ip;
         private int _port;
         
+        public Action<int> OnEnterRoomPacket { get; set; }
+        
         public ClientControl(ClientView view, NetworkPeer peer)
         {
             _view = view;
@@ -36,6 +40,7 @@ namespace Scenes.ClientScene
             _peer.OnDisconnect = OnDisconnect;
             _peer.OnReceive = OnReceivePacket;
 
+            UnityMainThreadDispatcher.Instance.Initialize();
             RefreshConnectText();
         }
 
@@ -117,6 +122,7 @@ namespace Scenes.ClientScene
 
         private void OnDisconnect()
         {
+            _view.ConnectButton.interactable = false;
         }
 
         private void OnReceivePacket(Packet p)
@@ -149,6 +155,15 @@ namespace Scenes.ClientScene
                     {
                         float delta = Time.realtimeSinceStartup - _lastPingSendTime;
                         _view.DelayText.text = $"{((int)(delta * 1000)).ToString(CultureInfo.CurrentCulture)}ms";
+                    }
+                    break;
+                }
+                case PacketId.EnterRoomReceive:
+                {
+                    var receive = JsonUtility.FromJson<EnterRoom>(p.Str);
+                    if (!receive.IsError())
+                    {
+                        OnEnterRoomPacket?.Invoke(receive.roomNumber);
                     }
                     break;
                 }

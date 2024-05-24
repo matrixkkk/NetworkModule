@@ -49,9 +49,10 @@ namespace ServerSide
 
         #region [ callbacks ]
         public Action<string, SocketObject> AcceptCompleteCallback { get; set; }
-        
+        public Action<SocketObject> CloseSockCallback { get; set; }
+
         //message 콜백
-        public Action<string> UserLoginCallback { get; set; } 
+        public Action<SocketObject, string> UserLoginCallback { get; set; } 
         #endregion
 
         #region [ private ]
@@ -100,7 +101,7 @@ namespace ServerSide
                 {
                     LoginReceive login = JsonUtility.FromJson<LoginReceive>(p.Packet.Str);
 
-                    UserLoginCallback?.Invoke(login.id);
+                    UserLoginCallback?.Invoke(p.Owner, login.id);
 
                     ulong sessionID = IssueSessionID();
                     p.Owner.SetSessionID(sessionID);
@@ -234,6 +235,10 @@ namespace ServerSide
             {
                 _socketObjectList.Remove(owner);
             }
+            
+            owner.Close();
+            _objectPool.Release(owner);
+            CloseSockCallback?.Invoke(owner);
         }
         #endregion
 
