@@ -40,7 +40,7 @@ namespace ServerSide
 
         #region [ properties ]
         public bool IsRunning => _isRunning;
-
+        private
         #endregion
 
         #region [ callbacks ]
