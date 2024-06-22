@@ -1,0 +1,19 @@
+name: Test PR
+
+on:
+  pull_request:
+    branches:
+      - master
+jobs:
+  build: 
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: .NET Lint
+        uses: zyactions/dotnet-lint@v1
+        with:
+          workspace: test
+          implicit-restore: true
