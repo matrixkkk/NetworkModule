@@ -60,17 +60,18 @@ namespace Scenes
             {
                 lock (_lock)
                 {
-                    if (_userRoomDic.TryGetValue(user.Id, out var room))
-                    {
-                        room.LeaveUser(user.Id);
-                        _userRoomDic.Remove(user.Id);
-                    }
-                    else
-                    {
-                        OnError?.Invoke("Not Found Room");
-                    }
+                    if (!_userRoomDic.TryGetValue(user.Id, out var room)) return;
+                    room.LeaveUser(user.Id);
+                    _userRoomDic.Remove(user.Id);
                 }
             });
+        }
+
+        public void Clear()
+        {
+            _roomList.Clear();
+            _userRoomDic.Clear();
+            _roomNumberId = 0;
         }
     }
 }

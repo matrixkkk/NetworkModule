@@ -1,5 +1,4 @@
 using System;
-using Assets.Scripts.ServerSide;
 using ServerSide;
 
 namespace Scenes
@@ -14,9 +13,10 @@ namespace Scenes
         private SocketObject _socketObject;
         private string _userId;
         private int _roomId = -1;  //-1인 경우 룸 없는 상태
+
+        public bool IsConnected => _socketObject?.IsConnected ?? false;
+        public bool InEnterRoom => _roomId != -1;
         
-        public long InstanceID => _instanceID;
-        public Action<SocketObject> ReleaseCallback { get; set; } 
         public long Id
         {
             get => _instanceID;
@@ -38,6 +38,14 @@ namespace Scenes
         public void SetAsyncObject(SocketObject obj)
         {
             _socketObject = obj;
+        }
+
+        public void Clear()
+        {
+            _socketObject = null;
+            _userId = null;
+            _instanceID = 0;
+            _roomId = -1;
         }
 
         /// <summary>

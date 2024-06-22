@@ -1,11 +1,9 @@
-﻿using Assets.Scripts.Protocol;
-using System;
-using System.IO;
+﻿using System;
 using System.Net.Sockets;
-using System.Security.Cryptography;
-using UnityEngine;
+using Assets.Scripts;
+using Assets.Scripts.Protocol;
 
-namespace Assets.Scripts.ServerSide
+namespace ServerSide
 {
     /// <summary>
     /// 소켓 객체
@@ -33,15 +31,13 @@ namespace Assets.Scripts.ServerSide
         public bool IsError => _isError;
         public string ErrorText => _errorText;
         public long InstanceId { get; set; }
+        public bool IsConnected => _socket.Connected;
 
         public delegate void OnReceivePacketCallback(Packet p, SocketObject target);
 
         public OnReceivePacketCallback OnReceive { get; set; }
-        public delegate void OnSocketCloseCallback(SocketObject owner);
-        public OnSocketCloseCallback OnCloseSocket { get; set; }
 
         public ulong SessionID => _sessionID;
-
 
         public SocketObject(int bufferSize, byte[] aKey)
         {
@@ -57,6 +53,12 @@ namespace Assets.Scripts.ServerSide
             _receiveOffset = 0;
             _sessionID = 0;
             _socket = null;
+            _seq = 0;
+            _receiveHeader = false;
+            _receiveOffset = 0;
+            _receiveSize = 0;
+            _isError = false;
+            _errorText = null;
         }
 
         public void SetSocket(Socket socket)
@@ -79,7 +81,7 @@ namespace Assets.Scripts.ServerSide
 
         public void Close()
         {
-            _socket.Close();
+            _socket?.Close();
         }
 
         private void ReceiveCallback(IAsyncResult asyncResult)
@@ -93,7 +95,7 @@ namespace Assets.Scripts.ServerSide
             int size = asyncObj._socket.EndReceive(asyncResult);
             if (size == 0)
             {
-                OnCloseSocket?.Invoke(this);
+                asyncObj._socket.Close();
             }
             else
             {
@@ -147,7 +149,7 @@ namespace Assets.Scripts.ServerSide
                 {
                     Array.Clear(_iv, 0, _iv.Length);
                 }
-                byte[] bytes = AES128.Decrypt(_buffer, 0, _receiveSize, _key);
+                byte[] bytes = AES128.Decrypt(_buffer, 0, _receiveSize, _key, _iv);
                
                 uint crc = CRC32.GetCRC(bytes, bytes.Length);
                 var pid = BitConverter.GetBytes(_header.pId);
@@ -172,9 +174,10 @@ namespace Assets.Scripts.ServerSide
 
         public void Send(ushort id, string jsonStr)
         {
+            _seq++;
             Packet p = new Packet(id, jsonStr)
             {
-                Seq = _seq++
+                Seq = _seq
             };
 
             UInt64 high = _sessionID;

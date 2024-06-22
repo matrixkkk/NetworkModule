@@ -37,8 +37,10 @@ namespace Scenes.ClientScene
 
             _view.ConnectButton.onClick.AddListener(OnClickLogin);
             _peer.OnConnect = OnConnect;
+            _peer.OnConnectFailed = OnConnectFail;
             _peer.OnDisconnect = OnDisconnect;
             _peer.OnReceive = OnReceivePacket;
+            _peer.OnException = OnException;
 
             UnityMainThreadDispatcher.Instance.Initialize();
             RefreshConnectText();
@@ -110,19 +112,42 @@ namespace Scenes.ClientScene
 
         private void OnConnect()
         {
-            _view.ConnectButton.interactable = true;
+            UnityMainThreadDispatcher.Instance.Enqueue(() =>
+            {
+                Debug.Log($"Connect success : {DateTime.Now.ToString(CultureInfo.InvariantCulture)}");
+                _view.ConnectButton.interactable = true;
+            });
+        }
+
+        private void OnConnectFail(string error)
+        {
+            UnityMainThreadDispatcher.Instance.Enqueue(() =>
+            {
+                Debug.LogError(error);
+            });
+        }
+
+        private void OnException(string message)
+        {
+            UnityMainThreadDispatcher.Instance.Enqueue(() =>
+            {
+                Debug.LogError(message);
+            });
         }
 
         public void Disconnect()
         {
             _peer?.Disconnect();
             _isLogin = false;
-            RefreshConnectText();
         }
 
         private void OnDisconnect()
         {
-            _view.ConnectButton.interactable = false;
+            UnityMainThreadDispatcher.Instance.Enqueue(() =>
+            {
+                _view.ConnectButton.interactable = false;
+                RefreshConnectText();
+            });
         }
 
         private void OnReceivePacket(Packet p)

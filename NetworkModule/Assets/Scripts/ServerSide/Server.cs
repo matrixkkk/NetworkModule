@@ -4,7 +4,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
-using Assets.Scripts.ServerSide;
 using UnityEngine;
 using UnityEngine.Pool;
 
@@ -33,7 +32,6 @@ namespace ServerSide
 
         private ObjectPool<SocketObject> _objectPool;
 
-        private readonly List<SocketObject>    _socketObjectList = new List<SocketObject>();                //비동기 객체 리스트
         private readonly Queue<ReceivePacket> _receivePacketQueue = new ();           //받은 패킷 큐.
 
         private byte[] _baseKey;                    //기본 암호화 키
@@ -49,7 +47,6 @@ namespace ServerSide
 
         #region [ callbacks ]
         public Action<string, SocketObject> AcceptCompleteCallback { get; set; }
-        public Action<SocketObject> CloseSockCallback { get; set; }
 
         //message 콜백
         public Action<SocketObject, string> UserLoginCallback { get; set; } 
@@ -100,9 +97,7 @@ namespace ServerSide
                 case ReceiveId.Login:
                 {
                     LoginReceive login = JsonUtility.FromJson<LoginReceive>(p.Packet.Str);
-
-                    UserLoginCallback?.Invoke(p.Owner, login.id);
-
+                    
                     ulong sessionID = IssueSessionID();
                     p.Owner.SetSessionID(sessionID);
 
@@ -115,6 +110,7 @@ namespace ServerSide
                     };
                     ushort receiveId = (ushort)(p.Packet.ID + 1);
                     p.Owner.Send(receiveId, send.ToJson());
+                    UserLoginCallback?.Invoke(p.Owner, login.id);
                     break;
                 }
                 case ReceiveId.Ping:
@@ -196,9 +192,7 @@ namespace ServerSide
                 var socketObject = _objectPool.Get();
                 socketObject.SetSocket(clientSocket);
                 socketObject.OnReceive = OnReceivePacket;
-                socketObject.OnCloseSocket = OnCloseSocket;
                 socketObject.ReceiveStart();
-                _socketObjectList.Add(socketObject);
                 AcceptCompleteCallback?.Invoke(clientSocket.RemoteEndPoint.ToString(), socketObject);
             }
 
@@ -224,22 +218,6 @@ namespace ServerSide
                 _receivePacketQueue.Enqueue(receivePacket);
             }
         }
-
-        /// <summary>
-        /// 소켓 close 콜백
-        /// </summary>
-        /// <param name="owner"></param>
-        private void OnCloseSocket(SocketObject owner)
-        {
-            lock(_socketObjLock)
-            {
-                _socketObjectList.Remove(owner);
-            }
-            
-            owner.Close();
-            _objectPool.Release(owner);
-            CloseSockCallback?.Invoke(owner);
-        }
         #endregion
 
         #region [ public ]
@@ -250,6 +228,16 @@ namespace ServerSide
                 actionOnRelease: o => o.Reset());
         }
 
+        public void ReleaseSocketObject(SocketObject socketObj)
+        {
+            socketObj.Close();
+            _objectPool?.Release(socketObj);
+        }
+
+        private void Clear()
+        {
+            _objectPool?.Dispose();
+        }
 
         public void StartServer()
         {
@@ -276,27 +264,11 @@ namespace ServerSide
 
             _bindSocket.Close();
             _bindSocket = null;
-
             _isRunning = false;
-
-            lock (_socketObjLock)
-            {
-                foreach (var obj in _socketObjectList)
-                {
-                    obj.Close();
-                }
-            }
+            
+            Clear();
         }
         
-        public void RemoveSocketObject(SocketObject obj)
-        {
-            lock (_socketObjLock)
-            {
-                obj.Close();
-                _socketObjectList.Remove(obj);
-                _objectPool.Release(obj);
-            }
-        }
         #endregion
     }
 }

@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
-using Assets.Scripts.ServerSide;
 using Scenes.Server;
+using ServerSide;
 using UnityEngine.Pool;
 
 namespace Scenes.ServerCode
@@ -26,7 +26,7 @@ namespace Scenes.ServerCode
         private long _instanceId = 0;
 
         private readonly object _activeUserLock = new();
-        private List<UserController> _activeUserList = new List<UserController>();      //활성 유저 리스트
+        private readonly List<UserController> _activeUserList = new List<UserController>();      //활성 유저 리스트
 
         public ServerController(ServerView view, ServerSide.Server server)
         {
@@ -44,28 +44,78 @@ namespace Scenes.ServerCode
 
             _server.AcceptCompleteCallback = OnAccept;
             _server.UserLoginCallback = OnLoginUser;
-            _server.CloseSockCallback = OnCloseSocketUser;
             
             _server.Initialize();
-            _userPool = new ObjectPool<UserController>(() => new UserController());
+            _userPool = new ObjectPool<UserController>(() => new UserController(), actionOnRelease: controller =>
+            {
+                controller.Clear();
+            });
 
             _matchMaker.OnError = OnError;
             _matchMaker.OnMessage = OnMessage;
         }
 
+        public void UpdateServer()
+        {
+            lock (_activeUserLock)
+            {
+                for (int i = 0; i < _activeUserList.Count;)
+                {
+                    var userController = _activeUserList[i];
+                    if (!userController.IsConnected)
+                    {
+                        DisconnectUser(userController);
+                        _activeUserList.RemoveAt(i);
+                    }
+                    else i++;
+                }
+            }
+        }
+
+        private void DisconnectUser(UserController userController)
+        {
+            if (!string.IsNullOrEmpty(userController.UserId))
+            {
+                Log(userController.UserId);
+            }
+            
+            _server.ReleaseSocketObject(userController.SocketObj);
+            if (userController.InEnterRoom)
+            {
+                _matchMaker.ExitUser(userController);
+            }
+            _userPool.Release(userController);
+        }
+
+        private void ClearAllUser()
+        {
+            lock (_activeUserLock)
+            {
+                foreach (var user in _activeUserList)
+                {
+                    user.SocketObj?.Close();
+                }
+                _activeUserList.Clear();
+                _userPool.Clear();
+            }
+        }
+
         private void RunServer()
         {
-            SetText("Start Server");
+            AddConsole("Start Server");
             _server.StartServer();
         }
 
         private void StopServer()
         {
-            SetText("Stop Server");
+            AddConsole("Stop Server");
             _server.EndServer();
+
+            ClearAllUser();
+            _matchMaker.Clear();
         }
 
-        private void SetText(string text, bool error = false)
+        private void AddConsole(string text, bool error = false)
         {
             if (CONSOLE_MAX_COUNT < _consoleLineCount)
             {
@@ -85,22 +135,24 @@ namespace Scenes.ServerCode
             _serverView.ConsoleText.text = _consoleText.ToString();
         }
 
+        private void Log(string text)
+        {
+            UnityMainThreadDispatcher.Instance.Enqueue(() =>
+            {
+                AddConsole(text);
+            });
+        }
+
         #region EventReceiver
 
         private void OnMessage(string msg)
         {
-            UnityMainThreadDispatcher.Instance.Enqueue(() =>
-            {
-                SetText(msg);
-            });
+            Log(msg);
         }
 
         private void OnError(string error)
         {
-            UnityMainThreadDispatcher.Instance.Enqueue(() =>
-            {
-                SetText(error, true);
-            });
+            Log(error);
         }
 
         private void OnClickRun()
@@ -125,17 +177,14 @@ namespace Scenes.ServerCode
         {
             UnityMainThreadDispatcher.Instance.Enqueue(() =>
             {
-                SetText($"Accept : {ip}");
+                AddConsole($"Accept : {ip}");
             });
 
             var user = _userPool.Get();
             user.SetAsyncObject(socketObject);
             user.Id = ++_instanceId;
             socketObject.InstanceId = user.Id;
-            user.ReleaseCallback = (socketObj) =>
-            {
-                _server.RemoveSocketObject(socketObj);
-            };
+            
             lock (_activeUserLock)
             {
                 _activeUserList.Add(user);
@@ -150,7 +199,7 @@ namespace Scenes.ServerCode
         {
             UnityMainThreadDispatcher.Instance.Enqueue(() =>
             {
-                SetText($"Login : {id}");
+                AddConsole($"Login : {id}");
             });
 
             var user = GetUser(obj);
@@ -168,26 +217,6 @@ namespace Scenes.ServerCode
             {
                 return _activeUserList.Find(f => f.SocketObj== obj);
             }
-        }
-
-        private void OnCloseSocketUser(SocketObject obj)
-        {
-            string userId = "";
-            lock (_activeUserLock)
-            {
-                int idx = _activeUserList.FindIndex(f=> f.Id == obj.InstanceId);
-                if (idx != -1)
-                {
-                    var user = _activeUserList[idx];
-                    userId = user.Id.ToString();
-                    _matchMaker.ExitUser(user);
-                    _userPool.Release(user);
-                }
-            }
-            UnityMainThreadDispatcher.Instance.Enqueue(() =>
-            {
-                SetText($"CloseSocket : {userId}");
-            });
         }
         #endregion
     }

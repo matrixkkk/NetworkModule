@@ -1,3 +1,4 @@
+using System;
 using Scenes.Server;
 using UnityEngine;
 
@@ -16,6 +17,11 @@ namespace Scenes.ServerCode
             
             _controller = new ServerController(view, server);
             _controller.Initialize();
+        }
+
+        private void Update()
+        {
+            _controller?.UpdateServer();
         }
     }
 }
