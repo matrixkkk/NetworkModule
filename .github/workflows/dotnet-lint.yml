@@ -2,7 +2,7 @@ name: Dotnet lint
 
 on:
   push:
-    
+
 jobs:
   build: 
     runs-on: ubuntu-latest
@@ -14,5 +14,4 @@ jobs:
       - name: .NET Lint
         uses: zyactions/dotnet-lint@v1
         with:
-          workspace: NetworkModule
           implicit-restore: true
