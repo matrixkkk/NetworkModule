@@ -30,26 +30,28 @@ namespace Assets.Scripts
         }
 
         //128 암호화
-        public static byte[] Encrypt(byte[] input, int size, byte[] key)
+        public static byte[] Encrypt(byte[] input, int size, byte[] key, byte[] iv)
         {
-            RijndaelManaged RijndaelCipher = new RijndaelManaged();
+            RijndaelManaged rijndaelCipher = new RijndaelManaged();
 
-            RijndaelCipher.Key = key;
-            RijndaelCipher.Mode = CipherMode.ECB;
-            RijndaelCipher.Padding = PaddingMode.PKCS7;
+            rijndaelCipher.Key = key;
+            rijndaelCipher.IV = iv;
+            rijndaelCipher.Mode = CipherMode.ECB;
+            rijndaelCipher.Padding = PaddingMode.PKCS7;
 
-            ICryptoTransform Encryptor = RijndaelCipher.CreateEncryptor();
+            ICryptoTransform encryptor = rijndaelCipher.CreateEncryptor();
 
-            return Encryptor.TransformFinalBlock(input, 0, size);
+            return encryptor.TransformFinalBlock(input, 0, size);
         }
 
-        public static byte[] Decrypt(byte[] input, int offset, int size, byte[] key)
+        public static byte[] Decrypt(byte[] input, int offset, int size, byte[] key, byte[] iv)
         {
-            RijndaelManaged RijndaelCipher = new RijndaelManaged();
+            RijndaelManaged rijndaelCipher = new RijndaelManaged();
 
-            RijndaelCipher.Key = key;
-            RijndaelCipher.Mode = CipherMode.ECB;
-            RijndaelCipher.Padding = PaddingMode.PKCS7;
+            rijndaelCipher.Key = key;
+            rijndaelCipher.IV = iv;
+            rijndaelCipher.Mode = CipherMode.ECB;
+            rijndaelCipher.Padding = PaddingMode.PKCS7;
 
             if (size < key.Length)
             {
@@ -59,13 +61,12 @@ namespace Assets.Scripts
             byte[] resultArray = null;
             try
             {
-                ICryptoTransform dectryption = RijndaelCipher.CreateDecryptor();
-                resultArray = dectryption.TransformFinalBlock(input, offset, size);
+                ICryptoTransform decryption = rijndaelCipher.CreateDecryptor();
+                resultArray = decryption.TransformFinalBlock(input, offset, size);
             }
             catch (CryptographicException e)
             {
                 Debug.LogError(e.Message);
-                return null;
             }
 
             return resultArray;

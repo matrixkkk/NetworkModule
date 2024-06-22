@@ -9,3 +9,8 @@ Obj/
 *.csproj
 *.sln
 *.user
+NetworkModule/Builds/ClientApp/ClientScene.app/Contents/_CodeSignature/
+
+NetworkModule/Builds/ClientApp/ClientScene.app/Contents/Frameworks/
+
+NetworkModule/Builds/

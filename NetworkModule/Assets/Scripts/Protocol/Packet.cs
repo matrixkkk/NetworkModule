@@ -1,5 +1,4 @@
-﻿using Assets.Scripts.ServerSide;
-using System;
+﻿using System;
 using System.IO;
 using System.Security.Cryptography;
 
@@ -29,18 +28,18 @@ namespace Assets.Scripts.Protocol
         public const int MINIMUM_BODY_SIZE = 16;
 
         //헤더에 들어갈 정보
-        private Header header;
-        private string jsonStr;                 //jsonStr : 서버에서 받음
+        private Header _header;
+        private string _jsonStr;                 //jsonStr : 서버에서 받음
 
-        public ushort ID => header.pId;
-        public ushort Seq { set => header.seq = value; }
-        public string Str => jsonStr;
+        public ushort ID => _header.pId;
+        public ushort Seq { set => _header.seq = value; }
+        public string Str => _jsonStr;
         public static string Empty => "{}";
 
 
         public Packet(ushort id, string json)
         {
-            header = new Header()
+            _header = new Header()
             {
                 pId = id,
                 seq = 0,
@@ -48,35 +47,35 @@ namespace Assets.Scripts.Protocol
                 size = 0,
                 crc = 0
             };
-            jsonStr = json;
+            _jsonStr = json;
         }
 
         public Packet(Header aHeader, string json)
         {
-            header = aHeader;
-            jsonStr = json;
+            _header = aHeader;
+            _jsonStr = json;
         }
 
         public int ToByte(byte[] outputBuffer, byte[] key, byte[] iv, bool crcCheck)
         {
-            jsonStr += "\0";
+            _jsonStr += "\0";
 
-            int bodySize = System.Text.Encoding.UTF8.GetBytes(jsonStr, 0, jsonStr.Length, outputBuffer, 0);          
+            int bodySize = System.Text.Encoding.UTF8.GetBytes(_jsonStr, 0, _jsonStr.Length, outputBuffer, 0);          
 
 
             if (crcCheck)
             {
                 uint crc = CRC32.GetCRC(outputBuffer, bodySize);
-                var pid = System.BitConverter.GetBytes(header.pId);
-                var seq = System.BitConverter.GetBytes(header.seq);
+                var pid = System.BitConverter.GetBytes(_header.pId);
+                var seq = System.BitConverter.GetBytes(_header.seq);
                 crc = CRC32.GetCRC(pid, pid.Length, crc);
                 crc = CRC32.GetCRC(seq, seq.Length, crc);
-                header.crc = crc;
+                _header.crc = crc;
             }
 
             try
             {
-                byte[] bytes = AES128.Encrypt(outputBuffer, bodySize, key);
+                byte[] bytes = AES128.Encrypt(outputBuffer, bodySize, key, iv);
                 Array.Copy(bytes, 0, outputBuffer, HEADER_SIZE, bytes.Length);
                 bodySize = bytes.Length;
             }
@@ -86,24 +85,24 @@ namespace Assets.Scripts.Protocol
                 return 0;
             }
 
-            header.size = (uint)(bodySize + HEADER_SIZE);
+            _header.size = (uint)(bodySize + HEADER_SIZE);
 
             int offset = 0;
             uintToByte(MAGIC, outputBuffer, offset);
             offset += sizeof(uint);
 
-            ushortToByte(header.pId, outputBuffer, offset);
+            ushortToByte(_header.pId, outputBuffer, offset);
             offset += sizeof(ushort);
 
-            ushortToByte(header.seq, outputBuffer, offset);
+            ushortToByte(_header.seq, outputBuffer, offset);
             offset += sizeof(ushort);
 
-            uintToByte(header.size, outputBuffer, offset);
+            uintToByte(_header.size, outputBuffer, offset);
             offset += sizeof(uint);
 
-            uintToByte(header.crc, outputBuffer, offset);
+            uintToByte(_header.crc, outputBuffer, offset);
             offset += sizeof(uint);
-            return (int)header.size;
+            return (int)_header.size;
         }
 
         private void uintToByte(uint aValue, byte[] buffer, int offset)
