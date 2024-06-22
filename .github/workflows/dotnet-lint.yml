@@ -13,5 +13,5 @@ jobs:
       - name: .NET Lint
         uses: zyactions/dotnet-lint@v1
         with:
-          workspace: Assembly-CSharp.csproj
+          workspace: NetworkModule/Assembly-CSharp.csproj
           implicit-restore: true
