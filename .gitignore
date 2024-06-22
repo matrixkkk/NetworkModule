@@ -6,6 +6,5 @@ Temp/
 UserSettings/
 Obj/
 
-*.csproj
 *.sln
 *.user
