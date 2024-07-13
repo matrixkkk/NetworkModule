@@ -1,7 +1,0 @@
-[*]
-trim_trailing_whitespace = false
-insert_final_newline = false
-
-# 추가적인 공백 관련 규칙 비활성화
-dotnet_diagnostic.IDE0055.severity = none
-dotnet_diagnostic.IDE0065.severity = none
