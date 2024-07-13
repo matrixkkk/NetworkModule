@@ -1,0 +1,17 @@
+name: Dotnet lint
+
+on:
+  push:
+jobs:
+  build: 
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: .NET Lint
+        uses: zyactions/dotnet-lint@v1
+        with:
+          workspace: NetworkModule/Assembly-CSharp.csproj
+          implicit-restore: true
