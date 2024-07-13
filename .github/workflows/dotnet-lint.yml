@@ -15,4 +15,5 @@ jobs:
         with:
           workspace: NetworkModule/Assembly-CSharp.csproj
           implicit-restore: true
-          severity: 'warning'
+          severity: 'error'
+          diagnostics: '-WHITESPACE'
