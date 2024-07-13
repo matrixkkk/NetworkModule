@@ -15,4 +15,4 @@ jobs:
         with:
           workspace: NetworkModule/Assembly-CSharp.csproj
           implicit-restore: true
-          config-file: NetworkModule/.dotnet-lint.json
+          severity: 'warning'
