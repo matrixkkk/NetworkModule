@@ -2,9 +2,10 @@
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
-using Assets.Scripts.ServerSide;
 using UnityEngine;
+using UnityEngine.Pool;
 
 namespace ServerSide
 {
@@ -15,7 +16,7 @@ namespace ServerSide
         /// </summary>
         private struct ReceivePacket
         {
-            public AsyncObject Owner;
+            public SocketObject Owner;
             public Assets.Scripts.Protocol.Packet Packet;
         }
 
@@ -27,27 +28,27 @@ namespace ServerSide
         private Socket _bindSocket;                   //bind 소켓
         private bool _isRunning = false;            //서버 구동중
         private readonly object _packetLock = new object();    //packet lock
-        private readonly object _asyncObjLock = new object();
+        private readonly object _socketObjLock = new object();
 
-        private readonly List<AsyncObject> _asyncObjectList = new List<AsyncObject>();                //비동기 객체 리스트
-        private readonly Queue<ReceivePacket> _receivePacketQueue = new Queue<ReceivePacket>();           //받은 패킷 큐.
+        private ObjectPool<SocketObject> _objectPool;
+
+        private readonly Queue<ReceivePacket> _receivePacketQueue = new ();           //받은 패킷 큐.
 
         private byte[] _baseKey;                    //기본 암호화 키
         private byte[] _cryptoKey;                  //변하는 키
 
         private ulong _sessionID = 0;                //발급 세션 id
         private readonly object _sessionLock = new object();
-
+        
         #region [ properties ]
         public bool IsRunning => _isRunning;
-        private
         #endregion
 
         #region [ callbacks ]
-        public Action<string> AcceptCompleteCallback { get; set; }
-        
+        public Action<string, SocketObject> AcceptCompleteCallback { get; set; }
+
         //message 콜백
-        public Action<string> UserLoginCallback { get; set; } 
+        public Action<SocketObject, string> UserLoginCallback { get; set; } 
         #endregion
 
         #region [ private ]
@@ -65,16 +66,28 @@ namespace ServerSide
         {
             lock (_packetLock)
             {
-                if (_receivePacketQueue.Count == 0) return;
+                if (_receivePacketQueue == null || _receivePacketQueue.Count == 0) return;
+            }
 
+            lock (_packetLock)
+            {
                 while (_receivePacketQueue.Count > 0)
                 {
-                    var p = _receivePacketQueue.Dequeue();
-                    ProcessPacket(p);
+                    if(_receivePacketQueue.TryDequeue(out var p))
+                    {
+                        Task.Run(() =>
+                        {
+                            ProcessPacket(p);
+                        });
+                    }
                 }
             }
         }
-
+        
+        /// <summary>
+        /// 비동기 패킷 처리
+        /// </summary>
+        /// <param name="p"></param>
         private void ProcessPacket(ReceivePacket p)
         {
             ReceiveId id = (ReceiveId)p.Packet.ID;
@@ -83,9 +96,7 @@ namespace ServerSide
                 case ReceiveId.Login:
                 {
                     LoginReceive login = JsonUtility.FromJson<LoginReceive>(p.Packet.Str);
-
-                    UserLoginCallback?.Invoke(login.id);
-
+                    
                     ulong sessionID = IssueSessionID();
                     p.Owner.SetSessionID(sessionID);
 
@@ -98,6 +109,7 @@ namespace ServerSide
                     };
                     ushort receiveId = (ushort)(p.Packet.ID + 1);
                     p.Owner.Send(receiveId, send.ToJson());
+                    UserLoginCallback?.Invoke(p.Owner, login.id);
                     break;
                 }
                 case ReceiveId.Ping:
@@ -158,6 +170,7 @@ namespace ServerSide
         #region [ coroutine ]
         private async void ProcessPacketLoop()
         {
+            ThreadPool.SetMaxThreads(5, 5);
             while (_isRunning)
             {
                 Dispatch();
@@ -172,23 +185,18 @@ namespace ServerSide
             if (_bindSocket == null) return;
 
             Socket clientSocket = _bindSocket.EndAccept(ar);
+            
+            lock (_socketObjLock)
+            {
+                var socketObject = _objectPool.Get();
+                socketObject.SetSocket(clientSocket);
+                socketObject.OnReceive = OnReceivePacket;
+                socketObject.ReceiveStart();
+                AcceptCompleteCallback?.Invoke(clientSocket.RemoteEndPoint.ToString(), socketObject);
+            }
 
             //다시 대기
             _bindSocket.BeginAccept(OnAccept, null);
-
-            AsyncObject asyncObj = new AsyncObject(clientSocket, RECEIVE_BUFFER_SIZE, _baseKey)
-            {
-                OnReceive = OnReceivePacket,
-                OnCloseSocket = OnCloseSocket
-            };
-
-            asyncObj.ReceiveStart();
-            lock (_asyncObjLock)
-            {
-                _asyncObjectList.Add(asyncObj);
-            }
-
-            AcceptCompleteCallback?.Invoke(clientSocket.RemoteEndPoint.ToString());
         }
 
         /// <summary>
@@ -197,35 +205,38 @@ namespace ServerSide
         /// </summary>
         /// <param name="p">패킷</param>
         /// <param name="owner">패킷 받은 주체</param>
-        private void OnReceivePacket(Assets.Scripts.Protocol.Packet p, AsyncObject owner)
+        private void OnReceivePacket(Assets.Scripts.Protocol.Packet p, SocketObject owner)
         {
+            var receivePacket = new ReceivePacket
+            {
+                Owner = owner,
+                Packet = p
+            };
             lock (_packetLock)
             {
-                var receivePacket = new ReceivePacket
-                {
-                    Owner = owner,
-                    Packet = p
-                };
-
                 _receivePacketQueue.Enqueue(receivePacket);
-            }
-        }
-
-        /// <summary>
-        /// 소켓 close 콜백
-        /// </summary>
-        /// <param name="owner"></param>
-        private void OnCloseSocket(AsyncObject owner)
-        {
-            lock(_asyncObjLock)
-            {
-                _asyncObjectList.Remove(owner);
             }
         }
         #endregion
 
         #region [ public ]
 
+        public void Initialize()
+        {
+            _objectPool = new ObjectPool<SocketObject>(() => new SocketObject(RECEIVE_BUFFER_SIZE, _baseKey),
+                actionOnRelease: o => o.Reset());
+        }
+
+        public void ReleaseSocketObject(SocketObject socketObj)
+        {
+            socketObj.Close();
+            _objectPool?.Release(socketObj);
+        }
+
+        private void Clear()
+        {
+            _objectPool?.Dispose();
+        }
 
         public void StartServer()
         {
@@ -252,14 +263,11 @@ namespace ServerSide
 
             _bindSocket.Close();
             _bindSocket = null;
-
             _isRunning = false;
-
-            foreach (AsyncObject obj in _asyncObjectList)
-            {
-                obj.Close();
-            }
+            
+            Clear();
         }
+        
         #endregion
     }
 }

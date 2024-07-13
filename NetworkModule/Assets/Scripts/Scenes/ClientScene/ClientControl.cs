@@ -1,7 +1,9 @@
+using System;
 using System.Globalization;
 using System.Threading.Tasks;
 using Assets.Scripts.Protocol;
 using ClientSide;
+using Scenes.Server;
 using UnityEngine;
 
 namespace Scenes.ClientScene
@@ -25,6 +27,8 @@ namespace Scenes.ClientScene
         private string _ip;
         private int _port;
         
+        public Action<int> OnEnterRoomPacket { get; set; }
+        
         public ClientControl(ClientView view, NetworkPeer peer)
         {
             _view = view;
@@ -33,9 +37,12 @@ namespace Scenes.ClientScene
 
             _view.ConnectButton.onClick.AddListener(OnClickLogin);
             _peer.OnConnect = OnConnect;
+            _peer.OnConnectFailed = OnConnectFail;
             _peer.OnDisconnect = OnDisconnect;
             _peer.OnReceive = OnReceivePacket;
+            _peer.OnException = OnException;
 
+            UnityMainThreadDispatcher.Instance.Initialize();
             RefreshConnectText();
         }
 
@@ -105,18 +112,42 @@ namespace Scenes.ClientScene
 
         private void OnConnect()
         {
-            _view.ConnectButton.interactable = true;
+            UnityMainThreadDispatcher.Instance.Enqueue(() =>
+            {
+                Debug.Log($"Connect success : {DateTime.Now.ToString(CultureInfo.InvariantCulture)}");
+                _view.ConnectButton.interactable = true;
+            });
+        }
+
+        private void OnConnectFail(string error)
+        {
+            UnityMainThreadDispatcher.Instance.Enqueue(() =>
+            {
+                Debug.LogError(error);
+            });
+        }
+
+        private void OnException(string message)
+        {
+            UnityMainThreadDispatcher.Instance.Enqueue(() =>
+            {
+                Debug.LogError(message);
+            });
         }
 
         public void Disconnect()
         {
             _peer?.Disconnect();
             _isLogin = false;
-            RefreshConnectText();
         }
 
         private void OnDisconnect()
         {
+            UnityMainThreadDispatcher.Instance.Enqueue(() =>
+            {
+                _view.ConnectButton.interactable = false;
+                RefreshConnectText();
+            });
         }
 
         private void OnReceivePacket(Packet p)
@@ -149,6 +180,15 @@ namespace Scenes.ClientScene
                     {
                         float delta = Time.realtimeSinceStartup - _lastPingSendTime;
                         _view.DelayText.text = $"{((int)(delta * 1000)).ToString(CultureInfo.CurrentCulture)}ms";
+                    }
+                    break;
+                }
+                case PacketId.EnterRoomReceive:
+                {
+                    var receive = JsonUtility.FromJson<EnterRoom>(p.Str);
+                    if (!receive.IsError())
+                    {
+                        OnEnterRoomPacket?.Invoke(receive.roomNumber);
                     }
                     break;
                 }

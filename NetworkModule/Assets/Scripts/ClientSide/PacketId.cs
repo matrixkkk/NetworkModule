@@ -5,6 +5,7 @@ namespace ClientSide
         LoginSend = 1000,
         LoginReceive = 1001,
         PingSend = 1002,
-        PingReceive = 1003
+        PingReceive = 1003,
+        EnterRoomReceive = 1005,
     }
 }

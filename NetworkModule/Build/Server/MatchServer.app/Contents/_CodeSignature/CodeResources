@@ -6,7 +6,7 @@
 	<dict>
 		<key>Resources/Data/Managed/Assembly-CSharp.dll</key>
 		<data>
-		Uj7XuAb1ugAUk2EKFJI0HBofLCs=
+		cax8d4XQEtEkALxTC690u8t38SM=
 		</data>
 		<key>Resources/Data/Managed/Mono.Security.dll</key>
 		<data>
@@ -86,15 +86,15 @@
 		</data>
 		<key>Resources/Data/Managed/Unity.AI.Navigation.dll</key>
 		<data>
-		BGRaLagBei6T18kIErjFTJXdY/w=
+		IqO/YVr1lde6yp3Qhjv2wcP3ffY=
 		</data>
 		<key>Resources/Data/Managed/Unity.TextMeshPro.dll</key>
 		<data>
-		qGdamP5iyuZbY1l4ch3Nh+RTxfE=
+		dOf9Ha33ihRh+wvj+CbtruhPXIY=
 		</data>
 		<key>Resources/Data/Managed/Unity.Timeline.dll</key>
 		<data>
-		80d4h0J43aO/XmuXKpLyanlDiF4=
+		NGfPGruNDKYg15bYlYU9BleSa+E=
 		</data>
 		<key>Resources/Data/Managed/UnityEngine.AIModule.dll</key>
 		<data>
@@ -274,7 +274,7 @@
 		</data>
 		<key>Resources/Data/Managed/UnityEngine.UI.dll</key>
 		<data>
-		HvGn8A7UnUIy2hli+59d9YE3Zek=
+		qvWmqkcGRZvdQDiOT8u1k/XXswU=
 		</data>
 		<key>Resources/Data/Managed/UnityEngine.UIElementsModule.dll</key>
 		<data>
@@ -398,19 +398,19 @@
 		</data>
 		<key>Resources/Data/globalgamemanagers</key>
 		<data>
-		W9YPNuiHWzdT1sDHDwm5ihmCxPY=
+		e0WWBI07rOSSVg1ByyLHXoD7+gg=
 		</data>
 		<key>Resources/Data/globalgamemanagers.assets</key>
 		<data>
-		I5jtFShJqDqmeEBBDt3d7+pOHpQ=
+		nQoYe1m4GrF++L0hN3WuIv9B+60=
 		</data>
 		<key>Resources/Data/level0</key>
 		<data>
-		v2xb+SCAsi5Jy0zFVTlGFFJnluY=
+		uvhZSWUra4RsqxRrBIfwLWagqkc=
 		</data>
 		<key>Resources/Data/resources.assets</key>
 		<data>
-		Ocnenq/dCQmmSv0AqLH/46rgdrs=
+		cJDsPN2z4Jb5h9N1kI/dVYrF9nA=
 		</data>
 		<key>Resources/Data/resources.assets.resS</key>
 		<data>
@@ -418,7 +418,7 @@
 		</data>
 		<key>Resources/Data/sharedassets0.assets</key>
 		<data>
-		kcUtl6ambvZ5yOe2ymldaYh7nPI=
+		WZEWcTDLJbewingZesSo149qhHI=
 		</data>
 		<key>Resources/Data/sharedassets0.assets.resS</key>
 		<data>
@@ -609,7 +609,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			3GVKIZauo3o2WCVKJitmyanYzANScdS4WvJPdkuPxNA=
+			UpfXnVsujCdL5+AuembusAPFeOFismwTwxIrK/L01FY=
 			</data>
 		</dict>
 		<key>Resources/Data/Managed/Mono.Security.dll</key>
@@ -749,21 +749,21 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			1LTXy7WiXDriF5zc9E0CuQI/1RoS7bM2cxgzMu3ZtVQ=
+			HLubaZi3zlrM0PtsislqU/HI9HDE1vIEXCJsW3yWj6A=
 			</data>
 		</dict>
 		<key>Resources/Data/Managed/Unity.TextMeshPro.dll</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			P4UVlSjdBQ2vRGdUcbcCExBDGXquEd5HND0z5yRwJUA=
+			bR3l2mYAqW1MNoH86BEqsjzBxDJZOXoe9e/30yZZyMw=
 			</data>
 		</dict>
 		<key>Resources/Data/Managed/Unity.Timeline.dll</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			65ZQf+FjhrymjiIr2Bj5L1t4cb5MyFkqm7J8kKgVrOA=
+			w6Im4LEM+2aQ/lcibmuSutTwR1Nt8+GYV9On7ybVGkc=
 			</data>
 		</dict>
 		<key>Resources/Data/Managed/UnityEngine.AIModule.dll</key>
@@ -1078,7 +1078,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			T29uD2zxstRxbOF10I2V7AgTI+ZeZmzuC0kRTnNi+is=
+			QFT/byMHxXDaYRPT2xjjbmrU9xiCCakp0CSvO1NCcr4=
 			</data>
 		</dict>
 		<key>Resources/Data/Managed/UnityEngine.UIElementsModule.dll</key>
@@ -1295,28 +1295,28 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			q/ZrkOhwedttB4SdHSGnESL9vPFJcYmrU3sHLAcGXgs=
+			BFGTYuq7jlhiVbsxe+M+MQPoUUZAvX2GzwOFSaMmbGQ=
 			</data>
 		</dict>
 		<key>Resources/Data/globalgamemanagers.assets</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			wg0aT5SdKYjfbLMQFX2DEH0GNlJDgQWstEHKEee+KKE=
+			Uas4BfsrOmTaNCnho3SBwwowOlqOK9xO4PHSj40Ax1c=
 			</data>
 		</dict>
 		<key>Resources/Data/level0</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			CmVRyBGPFn8yDabKkrf/phGWM/6E/2Aqr9BlqrO83XY=
+			aLRxueS5bFyaYY8/8+79ttpGHCjdhpW/5OCrTefwkog=
 			</data>
 		</dict>
 		<key>Resources/Data/resources.assets</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			n6neUDWJP2Bob5c+RkF21YKuGWuCSRn4Emh1OK0SxGs=
+			tqT4WpTiQaBvkY9/PlV5jGlK6NlAMDxCj4jXlxYaGRo=
 			</data>
 		</dict>
 		<key>Resources/Data/resources.assets.resS</key>
@@ -1330,7 +1330,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			qYpH8Nng5cJ5JOR8M5g/QOhDIyCb5/fI8uJtbKBKlm4=
+			sWvQoRXiMHRFKtuKJcRm/p7Qx6JJUkjdI2YQyez+z2Q=
 			</data>
 		</dict>
 		<key>Resources/Data/sharedassets0.assets.resS</key>
